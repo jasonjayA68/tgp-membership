@@ -20,6 +20,13 @@ export type Chapter = {
   name: string;
   district: string | null;
   region: string | null; // council
+  verify_officer_id: string | null; // admin profile who verifies this chapter
+  created_at: string;
+};
+
+export type DistrictOfficer = {
+  district: string;
+  officer_id: string | null;
   created_at: string;
 };
 
@@ -74,7 +81,6 @@ export type MemberCard = {
   alexis_name: string | null;
   batch_name: string | null;
   date_survived: string | null;
-  contact_number: string | null;
   gt_name: string | null;
   gt_number: string | null;
   mww_name: string | null;
@@ -86,6 +92,8 @@ export type MemberCard = {
   status: MemberStatus;
   photo_url: string | null;
   card_active: boolean;
+  verify_contact_name: string | null;
+  verify_contact_number: string | null;
 };
 
 /** Profile joined with its chapter — used throughout the authed app. */
@@ -104,6 +112,7 @@ export type Database = {
   public: {
     Tables: {
       chapters: Generated<Chapter>;
+      district_officers: Generated<DistrictOfficer>;
       profiles: {
         Row: Profile;
         Insert: Partial<Profile>;
