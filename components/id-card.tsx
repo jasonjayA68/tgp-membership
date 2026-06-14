@@ -61,19 +61,26 @@ export function IdCard({
   return (
     <div
       className={cn(
-        "relative isolate overflow-hidden rounded-xl border border-gold/40 bg-card tgp-guilloche tgp-glow",
+        "group relative isolate overflow-hidden rounded-2xl border border-gold/35 bg-card tgp-guilloche tgp-glow",
+        "transition-transform duration-300 ease-out hover:-translate-y-0.5",
         className,
       )}
     >
+      {/* Top sheen */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-0 h-20 bg-[radial-gradient(ellipse_75%_100%_at_50%_0%,color-mix(in_oklab,var(--gold)_18%,transparent),transparent_70%)] opacity-70 transition-opacity duration-300 group-hover:opacity-100"
+      />
+
       {/* Header band */}
-      <div className="relative z-10 flex items-center justify-between gap-2 border-b border-gold/30 bg-gradient-to-r from-gold/15 via-gold/5 to-transparent px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          <TgpSeal className="size-7" />
+      <div className="relative z-10 flex items-center justify-between gap-2 border-b border-gold/25 bg-gradient-to-r from-gold/15 via-gold/5 to-transparent px-5 py-3">
+        <div className="flex items-center gap-2.5">
+          <TgpSeal className="size-8" />
           <div className="leading-none">
-            <div className="tgp-display text-[11px] font-bold tracking-[0.16em] text-foreground">
+            <div className="tgp-display text-[12px] font-bold tracking-[0.18em] text-foreground">
               TAU GAMMA PHI
             </div>
-            <div className="mt-0.5 text-[8px] tracking-[0.28em] text-gold/70 uppercase">
+            <div className="mt-1 text-[8px] tracking-[0.3em] text-gold/70 uppercase">
               Member Identification
             </div>
           </div>
@@ -82,30 +89,36 @@ export function IdCard({
       </div>
 
       {/* Body */}
-      <div className="relative z-10 flex gap-4 p-4">
-        <Avatar
-          src={data.photoUrl}
-          name={data.fullName}
-          size={104}
-          rounded="lg"
-          priority={photoPriority}
-          className="ring-1 ring-gold/40"
-        />
-        <div className="flex min-w-0 flex-1 flex-col justify-between gap-3">
+      <div className="relative z-10 flex gap-5 p-5">
+        <div className="relative shrink-0">
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute -inset-1.5 -z-10 rounded-2xl bg-[radial-gradient(closest-side,color-mix(in_oklab,var(--gold)_26%,transparent),transparent)] opacity-0 blur-md transition-opacity duration-300 group-hover:opacity-100"
+          />
+          <Avatar
+            src={data.photoUrl}
+            name={data.fullName}
+            size={112}
+            rounded="lg"
+            priority={photoPriority}
+            className="ring-1 ring-gold/40"
+          />
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-[8px] font-medium tracking-[0.22em] text-gold/60 uppercase">
+            <div className="text-[8px] font-medium tracking-[0.24em] text-gold/60 uppercase">
               Registered Name
             </div>
-            <div className="tgp-display truncate text-base font-semibold tracking-tight text-foreground">
+            <div className="tgp-display tgp-gild mt-0.5 truncate text-lg font-semibold tracking-tight">
               {data.fullName || "—"}
             </div>
             {data.alexisName && (
               <div className="truncate text-xs text-gold/80 italic">
-                “{data.alexisName}”
+                &ldquo;{data.alexisName}&rdquo;
               </div>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
             <Detail label="Member ID" mono value={data.memberId ?? "PENDING"} />
             <Detail label="Batch" value={data.batchName ?? "—"} />
             <Detail label="Chapter" value={data.chapter ?? "Unassigned"} />
@@ -115,14 +128,15 @@ export function IdCard({
         </div>
       </div>
 
+      {/* Hairline rule */}
+      <div aria-hidden="true" className="relative z-10 mx-5 h-px tgp-rule" />
+
       {/* Footer band */}
-      <div className="relative z-10 flex items-center justify-between gap-2 border-t border-gold/30 px-4 py-2">
+      <div className="relative z-10 flex items-center justify-between gap-2 px-5 py-2.5">
         <span className="tgp-mono text-[9px] tracking-wider text-gold/60">
           {data.memberId ?? "TGP-————"}
         </span>
-        <span className="tgp-eyebrow text-[7px] text-gold/60">
-          {SITE.motto}
-        </span>
+        <span className="tgp-eyebrow text-[7px] text-gold/60">{SITE.motto}</span>
       </div>
 
       {/* Watermark seal */}
