@@ -228,3 +228,36 @@ export async function deleteChapter(formData: FormData): Promise<void> {
   revalidatePath("/admin");
   revalidatePath("/dashboard");
 }
+
+/** Assign (or clear) the verifying officer for a chapter. */
+export async function setChapterOfficer(formData: FormData): Promise<void> {
+  const { supabase } = await getAdminClient();
+  const chapterId = required(formData, "chapterId");
+  const raw = formData.get("officerId");
+  const officerId = typeof raw === "string" && raw.length > 0 ? raw : null;
+
+  const { error } = await supabase
+    .from("chapters")
+    .update({ verify_officer_id: officerId })
+    .eq("id", chapterId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin/chapters");
+}
+
+/** Assign (or clear) the verifying officer for a district. */
+export async function setDistrictOfficer(formData: FormData): Promise<void> {
+  const { supabase } = await getAdminClient();
+  const district = required(formData, "district");
+  const raw = formData.get("officerId");
+  const officerId = typeof raw === "string" && raw.length > 0 ? raw : null;
+
+  const { error } = officerId
+    ? await supabase
+        .from("district_officers")
+        .upsert({ district, officer_id: officerId }, { onConflict: "district" })
+    : await supabase.from("district_officers").delete().eq("district", district);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin/chapters");
+}
