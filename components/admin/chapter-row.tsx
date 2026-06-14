@@ -14,15 +14,18 @@ import {
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { deleteChapter, updateChapter } from "@/lib/actions/admin";
+import { ActionSelect } from "@/components/admin/action-select";
+import { deleteChapter, setChapterOfficer, updateChapter } from "@/lib/actions/admin";
 import type { Chapter } from "@/lib/types";
 
 export function ChapterRow({
   chapter,
   memberCount,
+  admins,
 }: {
   chapter: Chapter;
   memberCount: number;
+  admins: { id: string; full_name: string }[];
 }) {
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,6 +120,21 @@ export function ChapterRow({
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
+        <ActionSelect
+          action={setChapterOfficer}
+          name="officerId"
+          defaultValue={chapter.verify_officer_id ?? ""}
+          hidden={{ chapterId: chapter.id }}
+          ariaLabel={`Verifying officer for ${chapter.name}`}
+          className="hidden md:block"
+          options={[
+            { value: "", label: "— No officer —" },
+            ...admins.map((a) => ({
+              value: a.id,
+              label: a.full_name?.trim() || "(unnamed admin)",
+            })),
+          ]}
+        />
         <span className="hidden text-sm text-muted-foreground sm:inline">
           {memberCount} {memberCount === 1 ? "member" : "members"}
         </span>

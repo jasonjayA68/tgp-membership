@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { ChapterForm } from "@/components/admin/chapter-form";
 import { ChapterRow } from "@/components/admin/chapter-row";
+import { DistrictOfficers } from "@/components/admin/district-officers";
 import {
   Card,
   CardContent,
@@ -10,18 +11,34 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
-import type { Chapter } from "@/lib/types";
+import type { Chapter, DistrictOfficer } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Chapters" };
 
 export default async function ChaptersPage() {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("chapters")
-    .select("*")
-    .order("name");
-  if (error) throw error;
-  const chapters = (data ?? []) as Chapter[];
+
+  const [chaptersResult, adminsResult, districtOfficersResult] =
+    await Promise.all([
+      supabase.from("chapters").select("*").order("name"),
+      supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("role", ["admin", "super_admin"])
+        .order("full_name"),
+      supabase.from("district_officers").select("district, officer_id"),
+    ]);
+  if (chaptersResult.error) throw chaptersResult.error;
+  if (adminsResult.error) throw adminsResult.error;
+  if (districtOfficersResult.error) throw districtOfficersResult.error;
+
+  const chapters = (chaptersResult.data ?? []) as Chapter[];
+  const admins = (adminsResult.data ?? []) as {
+    id: string;
+    full_name: string;
+  }[];
+  const districtOfficers = (districtOfficersResult.data ??
+    []) as Pick<DistrictOfficer, "district" | "officer_id">[];
 
   const counts = await Promise.all(
     chapters.map((c) =>
@@ -35,6 +52,19 @@ export default async function ChaptersPage() {
         }),
     ),
   );
+
+  const districts = Array.from(
+    new Set(
+      chapters
+        .map((c) => c.district?.trim())
+        .filter((d): d is string => Boolean(d)),
+    ),
+  ).sort();
+
+  const currentDistrictOfficer: Record<string, string> = {};
+  for (const row of districtOfficers) {
+    if (row.officer_id) currentDistrictOfficer[row.district] = row.officer_id;
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -54,21 +84,30 @@ export default async function ChaptersPage() {
                 key={chapter.id}
                 chapter={chapter}
                 memberCount={counts[i]}
+                admins={admins}
               />
             ))
           )}
         </CardContent>
       </Card>
 
-      <Card className="h-fit">
-        <CardHeader>
-          <CardTitle>New chapter</CardTitle>
-          <CardDescription>Add a chapter or council.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ChapterForm />
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <Card className="h-fit">
+          <CardHeader>
+            <CardTitle>New chapter</CardTitle>
+            <CardDescription>Add a chapter or council.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChapterForm />
+          </CardContent>
+        </Card>
+
+        <DistrictOfficers
+          districts={districts}
+          admins={admins}
+          current={currentDistrictOfficer}
+        />
+      </div>
     </div>
   );
 }
