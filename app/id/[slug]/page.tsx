@@ -203,7 +203,7 @@ export default async function VerifyPage({
 
   return (
     <PageShell>
-      <article className="relative isolate overflow-hidden rounded-xl bg-card tgp-frame tgp-glow">
+      <article className="group relative isolate overflow-hidden rounded-2xl bg-card tgp-frame tgp-glow">
         {/* Security-pattern wash behind the credential */}
         <div
           className="pointer-events-none absolute inset-0 tgp-guilloche opacity-60"
@@ -365,19 +365,26 @@ export default async function VerifyPage({
           )}
         </div>
 
-        {/* Contact — the single filled-gold action */}
-        {card.contact_number && (
+        {/* Verify via the responsible officer (chapter → district). Hidden when none. */}
+        {card.verify_contact_number && (
           <div className="relative z-10 border-t border-gold/20 px-5 py-4">
             <a
-              href={`tel:${card.contact_number}`}
+              href={`tel:${card.verify_contact_number}`}
               className="flex items-center justify-between gap-3 rounded-lg bg-gold px-4 py-3 text-primary-foreground transition-opacity hover:opacity-90"
             >
               <span className="flex items-center gap-2.5">
                 <Phone className="size-5" strokeWidth={2.25} aria-hidden="true" />
                 <span className="flex flex-col leading-tight">
-                  <span className="tgp-eyebrow text-[0.6rem]">Call to verify</span>
+                  <span className="tgp-eyebrow text-[0.6rem]">
+                    Call officer to verify
+                  </span>
+                  {card.verify_contact_name && (
+                    <span className="text-[0.7rem] font-medium opacity-90">
+                      {card.verify_contact_name}
+                    </span>
+                  )}
                   <span className="tgp-mono text-sm font-semibold">
-                    {card.contact_number}
+                    {card.verify_contact_number}
                   </span>
                 </span>
               </span>
@@ -386,7 +393,7 @@ export default async function VerifyPage({
               </span>
             </a>
             <p className="mt-2 text-center text-[0.65rem] text-muted-foreground">
-              For legitimacy verification calls
+              Speak with a fraternity officer to confirm this member
             </p>
           </div>
         )}
