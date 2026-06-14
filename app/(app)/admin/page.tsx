@@ -77,7 +77,7 @@ export default async function AdminMembersPage({
     (async () => {
       let query = supabase
         .from("profiles")
-        .select("*, chapter:chapters(*)")
+        .select("*, chapter:chapters!profiles_chapter_id_fkey(*)")
         .order("created_at", { ascending: false })
         .limit(200);
       if (statusFilter) query = query.eq("status", statusFilter);

@@ -74,7 +74,7 @@ export default async function MemberDetailPage({
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("*, chapter:chapters(*)")
+    .select("*, chapter:chapters!profiles_chapter_id_fkey(*)")
     .eq("id", id)
     .maybeSingle<ProfileWithChapter>();
   if (profileError) throw profileError;

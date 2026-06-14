@@ -27,7 +27,7 @@ export const getAuth = cache(async (): Promise<AuthContext | null> => {
 
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("*, chapter:chapters(*)")
+    .select("*, chapter:chapters!profiles_chapter_id_fkey(*)")
     .eq("user_id", user.id)
     .maybeSingle();
   if (error) throw error;
