@@ -82,9 +82,10 @@ export async function updateSession(request: NextRequest) {
     if (!slug) return redirect("/", request, response);
     const rest = "/" + segs.slice(2).join("/");
 
-    // Public per-tenant verification (/t/[slug]/id/...) is anonymous — strip any
-    // spoofed tenant headers and route straight to the verify page (no auth gate).
-    if (segs[2] === "id") {
+    // Public per-tenant verification + homepage (/t/[slug]/id|home/...) are
+    // anonymous — strip any spoofed tenant headers and route straight through
+    // (no auth gate).
+    if (segs[2] === "id" || segs[2] === "home") {
       const clean = new Headers(request.headers);
       clean.delete("x-tenant-id");
       clean.delete("x-tenant-slug");
