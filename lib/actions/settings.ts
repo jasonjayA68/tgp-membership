@@ -39,6 +39,5 @@ export async function setTenantFeature(formData: FormData): Promise<void> {
     );
   if (error) throw new Error(error.message);
 
-  revalidatePath("/admin/settings");
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
 }
