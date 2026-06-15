@@ -120,7 +120,6 @@ export async function updateTenantBranding(
   const { error } = await supabase
     .from("tenants")
     .update({
-      logo_url: clean("logo_url"),
       primary_color: clean("primary_color"),
       secondary_color: clean("secondary_color"),
     })
@@ -305,4 +304,90 @@ export async function restoreTenant(formData: FormData): Promise<void> {
   });
   revalidatePath(`/platform/tenants/${tenantId}`);
   revalidatePath("/platform");
+}
+
+const LOGO_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/svg+xml",
+]);
+const LOGO_EXT: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/svg+xml": "svg",
+};
+
+/** Upload a tenant logo to the `branding` bucket and store its public URL. */
+export async function uploadTenantLogo(
+  _prev: PlatformState,
+  formData: FormData,
+): Promise<PlatformState> {
+  const { supabase, user } = await getPlatformContext();
+  const tenantId = String(formData.get("tenantId") ?? "");
+  if (!tenantId) return { error: "Missing tenant." };
+
+  const file = formData.get("logo");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "Choose a logo image to upload." };
+  }
+  if (!LOGO_TYPES.has(file.type)) {
+    return { error: "Logo must be a PNG, JPG, WebP, or SVG." };
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    return { error: "Logo must be 2 MB or smaller." };
+  }
+
+  const filename = `logo-${Date.now()}.${LOGO_EXT[file.type]}`;
+  const path = `${tenantId}/${filename}`;
+  const { error: upErr } = await supabase.storage
+    .from("branding")
+    .upload(path, file, { upsert: true, contentType: file.type });
+  if (upErr) return { error: upErr.message };
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from("branding").getPublicUrl(path);
+  const { error: updErr } = await supabase
+    .from("tenants")
+    .update({ logo_url: publicUrl })
+    .eq("id", tenantId);
+  if (updErr) return { error: updErr.message };
+
+  // Prune superseded logos for this tenant.
+  const { data: existing } = await supabase.storage.from("branding").list(tenantId);
+  const stale = (existing ?? [])
+    .filter((f) => f.name !== filename)
+    .map((f) => `${tenantId}/${f.name}`);
+  if (stale.length) await supabase.storage.from("branding").remove(stale);
+
+  await supabase.from("audit_logs").insert({
+    tenant_id: tenantId,
+    action: "branding_updated",
+    performed_by: user.id,
+    metadata: { logo: true },
+  });
+  revalidatePath(`/platform/tenants/${tenantId}`);
+  return { notice: "Logo updated." };
+}
+
+/** Remove a tenant's logo (clears logo_url + deletes the stored files). */
+export async function removeTenantLogo(formData: FormData): Promise<void> {
+  const { supabase, user } = await getPlatformContext();
+  const tenantId = String(formData.get("tenantId") ?? "");
+  if (!tenantId) return;
+
+  const { data: existing } = await supabase.storage.from("branding").list(tenantId);
+  const all = (existing ?? []).map((f) => `${tenantId}/${f.name}`);
+  if (all.length) await supabase.storage.from("branding").remove(all);
+
+  await supabase.from("tenants").update({ logo_url: null }).eq("id", tenantId);
+  await supabase.from("audit_logs").insert({
+    tenant_id: tenantId,
+    action: "branding_updated",
+    performed_by: user.id,
+    metadata: { logo: false },
+  });
+  revalidatePath(`/platform/tenants/${tenantId}`);
 }
