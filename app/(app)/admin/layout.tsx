@@ -1,6 +1,6 @@
 import { AdminNav } from "@/components/admin/admin-nav";
-import { requireAdmin } from "@/lib/auth";
-import { ROLE_META } from "@/lib/constants";
+import { requireTenantAdmin } from "@/lib/auth";
+import { TENANT_ROLE_META } from "@/lib/constants";
 
 export default async function AdminLayout({
   children,
@@ -8,7 +8,7 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   // Authoritative role gate for the entire /admin area.
-  const { profile } = await requireAdmin();
+  const { role } = await requireTenantAdmin();
 
   return (
     <div className="space-y-6">
@@ -22,7 +22,7 @@ export default async function AdminLayout({
           </h1>
         </div>
         <span className="text-xs tracking-widest text-muted-foreground uppercase">
-          {ROLE_META[profile?.role ?? "admin"].label}
+          {TENANT_ROLE_META[role ?? "admin"].label}
         </span>
       </header>
 
