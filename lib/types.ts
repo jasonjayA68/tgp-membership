@@ -31,6 +31,26 @@ export type Tenant = {
   created_at: string;
 };
 
+export type TenantPage = {
+  id: string;
+  tenant_id: string;
+  page_type: string;
+  content_json: { blocks: unknown[] };
+  updated_at: string;
+};
+
+/** Row shape returned by the public `get_tenant_homepage` RPC. */
+export type HomepageResult = {
+  tenant_name: string;
+  tenant_slug: string;
+  tenant_status: TenantStatus;
+  tenant_logo_url: string | null;
+  tenant_primary_color: string | null;
+  tenant_secondary_color: string | null;
+  content_json: { blocks: unknown[] };
+  member_count: number;
+};
+
 /** Per-tenant aggregate from `platform_tenant_stats`. */
 export type TenantStats = {
   tenant_id: string;
@@ -211,6 +231,7 @@ export type Database = {
         ];
       };
       audit_logs: Generated<AuditLog>;
+      tenant_pages: Generated<TenantPage>;
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -231,6 +252,7 @@ export type Database = {
         Returns: undefined;
       };
       platform_tenant_stats: { Args: Record<string, never>; Returns: TenantStats[] };
+      get_tenant_homepage: { Args: { p_slug: string }; Returns: HomepageResult[] };
     };
     Enums: {
       tenant_status: TenantStatus;
