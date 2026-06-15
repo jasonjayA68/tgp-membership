@@ -16,7 +16,7 @@ export async function requirePlatformAdmin(): Promise<{
   email: string | null;
 }> {
   const user = await getSessionUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/platform/login");
 
   const supabase = await createClient();
   const { data } = await supabase
