@@ -93,3 +93,79 @@ create table public.tenant_field_schema (
   created_at timestamptz not null default now(),
   unique (tenant_id, key)
 );
+
+-- ---- chapters ---------------------------------------------------------------
+create table public.chapters (
+  id          uuid primary key default gen_random_uuid(),
+  tenant_id   uuid not null references public.tenants (id) on delete cascade,
+  name        text not null,
+  district    text,
+  region      text,   -- council
+  verify_officer_id uuid,  -- FK to profiles added after that table exists
+  created_at  timestamptz not null default now(),
+  unique (tenant_id, name)
+);
+create index chapters_tenant_idx on public.chapters (tenant_id);
+
+-- ---- profiles (fraternal fields now live in custom_fields) ------------------
+create table public.profiles (
+  id            uuid primary key default gen_random_uuid(),
+  tenant_id     uuid not null references public.tenants (id) on delete cascade,
+  user_id       uuid not null references auth.users (id) on delete cascade,
+  full_name     text not null default '',
+  member_id     text,
+  chapter_id    uuid references public.chapters (id) on delete set null,
+  batch_year    int check (batch_year is null or batch_year between 1968 and 2100),
+  status        public.member_status not null default 'pending',
+  photo_url     text,
+  custom_fields jsonb not null default '{}'::jsonb,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  unique (tenant_id, user_id),
+  unique (tenant_id, member_id)
+);
+create index profiles_tenant_idx  on public.profiles (tenant_id);
+create index profiles_status_idx  on public.profiles (tenant_id, status);
+create index profiles_chapter_idx on public.profiles (chapter_id);
+
+-- chapters.verify_officer_id → profiles (added now that profiles exists)
+alter table public.chapters
+  add constraint chapters_verify_officer_fk
+  foreign key (verify_officer_id) references public.profiles (id) on delete set null;
+
+-- ---- nfc_cards --------------------------------------------------------------
+create table public.nfc_cards (
+  id               uuid primary key default gen_random_uuid(),
+  tenant_id        uuid not null references public.tenants (id) on delete cascade,
+  profile_id       uuid not null references public.profiles (id) on delete cascade,
+  slug             text not null unique,
+  active           boolean not null default true,
+  scan_count       integer not null default 0,
+  last_verified_at timestamptz,
+  created_at       timestamptz not null default now()
+);
+create index nfc_cards_profile_idx on public.nfc_cards (profile_id);
+create index nfc_cards_tenant_idx  on public.nfc_cards (tenant_id);
+
+-- ---- audit_logs -------------------------------------------------------------
+create table public.audit_logs (
+  id           uuid primary key default gen_random_uuid(),
+  tenant_id    uuid not null references public.tenants (id) on delete cascade,
+  action       text not null,
+  performed_by uuid references auth.users (id) on delete set null,
+  target_user  uuid references auth.users (id) on delete set null,
+  metadata     jsonb not null default '{}'::jsonb,
+  created_at   timestamptz not null default now()
+);
+create index audit_logs_tenant_idx on public.audit_logs (tenant_id, created_at desc);
+create index audit_logs_target_idx on public.audit_logs (target_user);
+
+-- ---- district_officers ------------------------------------------------------
+create table public.district_officers (
+  id         uuid primary key default gen_random_uuid(),
+  tenant_id  uuid not null references public.tenants (id) on delete cascade,
+  district   text not null,
+  officer_id uuid references public.profiles (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (tenant_id, district)
+);
