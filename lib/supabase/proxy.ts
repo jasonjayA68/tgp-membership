@@ -125,7 +125,8 @@ export async function updateSession(request: NextRequest) {
   // Strip any spoofed tenant headers on global routes too.
   if (
     request.headers.has("x-tenant-id") ||
-    request.headers.has("x-tenant-slug")
+    request.headers.has("x-tenant-slug") ||
+    request.headers.has("x-tenant-basepath")
   ) {
     const clean = new Headers(request.headers);
     clean.delete("x-tenant-id");

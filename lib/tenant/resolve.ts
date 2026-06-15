@@ -13,6 +13,7 @@ const client = createClient<Database>(env.SUPABASE_URL, env.SUPABASE_KEY, {
 });
 
 const TTL_MS = 60_000;
+const NEG_TTL_MS = 5_000;
 const cache = new Map<string, { tenant: ResolvedTenant | null; expires: number }>();
 
 export async function resolveTenantForMiddleware(
@@ -26,6 +27,9 @@ export async function resolveTenantForMiddleware(
     p_slug: slug,
   });
   const tenant = error || !data?.[0] ? null : (data[0] as ResolvedTenant);
-  cache.set(slug, { tenant, expires: now + TTL_MS });
+  cache.set(slug, {
+    tenant,
+    expires: now + (tenant ? TTL_MS : NEG_TTL_MS),
+  });
   return tenant;
 }
