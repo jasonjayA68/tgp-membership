@@ -87,23 +87,39 @@ export async function updateSession(request: NextRequest) {
     const tenant = await resolveTenantByHost(host);
     if (!tenant) return rewrite("/workspace-not-found", request, response);
 
-    const seg0 = path.split("/").filter(Boolean)[0];
+    // A custom domain is a transparent alias: a tenant-aware redirect to an
+    // absolute `/t/<this-slug>/<rest>` (e.g. from register/join) is equivalent
+    // to `/<rest>` here, so normalize it back to a host-relative path.
+    const segs = path.split("/").filter(Boolean);
+    const relPath =
+      segs[0] === "t" && segs[1] === tenant.slug
+        ? "/" + segs.slice(2).join("/")
+        : path;
+    const seg0 = relPath.split("/").filter(Boolean)[0];
+
+    // Strip any client-supplied (spoofed) tenant headers before trusting/using.
+    const clean = new Headers(request.headers);
+    clean.delete("x-tenant-id");
+    clean.delete("x-tenant-slug");
+    clean.delete("x-tenant-basepath");
+
+    // Global auth routes render same-origin on the custom domain (no tenant gate,
+    // no rewrite into the /t tree) — otherwise the logged-out redirect below
+    // would target /login and loop forever.
+    if (seg0 === "login" || seg0 === "register" || seg0 === "auth") {
+      return rewrite(relPath, request, response, clean);
+    }
 
     // Public per-tenant verification + homepage are anonymous. Their real routes
-    // live under app/t/[tenant]/..., so rewrite to the /t/<slug> path (stripping
-    // any spoofed tenant headers).
+    // live under app/t/[tenant]/..., so rewrite to the /t/<slug> path.
     if (seg0 === "id" || seg0 === "home") {
-      const clean = new Headers(request.headers);
-      clean.delete("x-tenant-id");
-      clean.delete("x-tenant-slug");
-      clean.delete("x-tenant-basepath");
-      return rewrite(`/t/${tenant.slug}${path}`, request, response, clean);
+      return rewrite(`/t/${tenant.slug}${relPath}`, request, response, clean);
     }
 
     // Logged-out → global login carrying the tenant slug + return path.
     if (!user) {
       return redirect(
-        `/login?tenant=${encodeURIComponent(tenant.slug)}&next=${encodeURIComponent(path)}`,
+        `/login?tenant=${encodeURIComponent(tenant.slug)}&next=${encodeURIComponent(relPath)}`,
         request,
         response,
       );
@@ -111,19 +127,15 @@ export async function updateSession(request: NextRequest) {
 
     // Authed workspace: inject trusted headers (empty basepath = root-relative
     // links) and rewrite to the flat (app) route; root → dashboard.
-    const requestHeaders = new Headers(request.headers);
-    requestHeaders.delete("x-tenant-id");
-    requestHeaders.delete("x-tenant-slug");
-    requestHeaders.delete("x-tenant-basepath");
-    requestHeaders.set("x-tenant-id", tenant.id);
-    requestHeaders.set("x-tenant-slug", tenant.slug);
-    requestHeaders.set("x-tenant-basepath", "");
+    clean.set("x-tenant-id", tenant.id);
+    clean.set("x-tenant-slug", tenant.slug);
+    clean.set("x-tenant-basepath", "");
 
     return rewrite(
-      path === "/" ? "/dashboard" : path,
+      relPath === "/" ? "/dashboard" : relPath,
       request,
       response,
-      requestHeaders,
+      clean,
     );
   }
 
