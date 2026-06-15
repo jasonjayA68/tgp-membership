@@ -59,14 +59,18 @@ Two `SECURITY DEFINER` (`search_path = public`) RPCs, **each gated** by
 `if not public.is_platform_admin() then raise exception 'forbidden'; end if;`:
 
 - **`assign_tenant_owner(p_tenant_id uuid, p_email text) returns void`** —
-  resolve `v_uid` from `auth.users` by `lower(email) = lower(p_email)`; if null →
-  `raise exception 'no account found for %', p_email`. Then:
+  - validate the tenant exists (`raise exception 'unknown tenant %'` otherwise);
+  - resolve the user from `auth.users` by `lower(email) = lower(p_email)` **ignoring soft-deleted
+    rows** (`deleted_at is null`); raise `'no account found for %'` if none and
+    `'multiple accounts found for %'` if more than one (don't silently pick);
   - `insert into tenant_users (tenant_id, user_id, role) values (p_tenant_id, v_uid, 'owner')
      on conflict (tenant_id, user_id) do update set role = 'owner'` (promotes an existing member);
-  - `insert into profiles (tenant_id, user_id, status) values (p_tenant_id, v_uid, 'active')
-     on conflict (tenant_id, user_id) do nothing` (ensures the owner has a profile; keeps any
-     existing one).
-  Granted to `authenticated`.
+  - write an `audit_logs` row (`action 'owner_assigned'`, `performed_by = auth.uid()`,
+    `target_user = v_uid`) — owner assignment is the highest-privilege tenant action and is audited
+    like the others.
+  **No profile is created** — the owner's access is role-based (`tenant_users`); a profile is
+  optional and they create one through the normal flow. (Creating an `active` profile with no
+  `member_id` would be a state the normal member flow never produces.) Granted to `authenticated`.
 
 - **`platform_tenant_stats() returns table (tenant_id uuid, member_count bigint, active_count bigint)`** —
   `select t.id, count(p.id), count(p.id) filter (where p.status = 'active') from tenants t

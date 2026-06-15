@@ -31,6 +31,13 @@ export type Tenant = {
   created_at: string;
 };
 
+/** Per-tenant aggregate from `platform_tenant_stats`. */
+export type TenantStats = {
+  tenant_id: string;
+  member_count: number;
+  active_count: number;
+};
+
 /** Public whitelist returned by `resolve_tenant_by_slug` — the active-tenant shape. */
 export type ResolvedTenant = Pick<
   Tenant,
@@ -217,6 +224,11 @@ export type Database = {
       is_tenant_admin: { Args: { tid: string }; Returns: boolean };
       is_tenant_owner: { Args: { tid: string }; Returns: boolean };
       next_member_id: { Args: { tid: string }; Returns: string };
+      assign_tenant_owner: {
+        Args: { p_tenant_id: string; p_email: string };
+        Returns: undefined;
+      };
+      platform_tenant_stats: { Args: Record<string, never>; Returns: TenantStats[] };
     };
     Enums: {
       tenant_status: TenantStatus;
