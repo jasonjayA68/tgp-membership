@@ -231,3 +231,78 @@ export async function removeCustomDomain(
   revalidatePath(`/platform/tenants/${tenantId}`);
   return { notice: "Custom domain removed." };
 }
+
+/** Edit an org's core fields (name / slug / member-ID prefix). */
+export async function updateTenant(
+  _prev: PlatformState,
+  formData: FormData,
+): Promise<PlatformState> {
+  const { supabase, user } = await getPlatformContext();
+  const tenantId = String(formData.get("tenantId") ?? "");
+  if (!tenantId) return { error: "Missing tenant." };
+
+  const name = String(formData.get("name") ?? "").trim();
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  const prefix = String(formData.get("prefix") ?? "").trim().toUpperCase();
+  if (name.length < 2) return { error: "Enter an organization name." };
+  if (!/^[a-z0-9-]{2,40}$/.test(slug)) {
+    return { error: "Slug must be 2–40 lowercase letters, numbers, or hyphens." };
+  }
+  if (!/^[A-Z0-9]{2,8}$/.test(prefix)) {
+    return { error: "Prefix must be 2–8 uppercase letters or numbers." };
+  }
+
+  const { error } = await supabase
+    .from("tenants")
+    .update({ name, slug, member_id_prefix: prefix })
+    .eq("id", tenantId);
+  if (error) {
+    return {
+      error:
+        error.code === "23505" || error.message.includes("duplicate")
+          ? "That slug is already taken."
+          : error.message,
+    };
+  }
+  await supabase.from("audit_logs").insert({
+    tenant_id: tenantId,
+    action: "tenant_updated",
+    performed_by: user.id,
+    metadata: { name, slug, prefix },
+  });
+  revalidatePath(`/platform/tenants/${tenantId}`);
+  revalidatePath("/platform");
+  return { notice: "Organization updated." };
+}
+
+/** Soft-delete: archive an org (data preserved, workspace blocked). */
+export async function archiveTenant(formData: FormData): Promise<void> {
+  const { supabase, user } = await getPlatformContext();
+  const tenantId = String(formData.get("tenantId") ?? "");
+  if (!tenantId) return;
+  await supabase.from("tenants").update({ status: "archived" }).eq("id", tenantId);
+  await supabase.from("audit_logs").insert({
+    tenant_id: tenantId,
+    action: "tenant_archived",
+    performed_by: user.id,
+    metadata: {},
+  });
+  revalidatePath(`/platform/tenants/${tenantId}`);
+  revalidatePath("/platform");
+}
+
+/** Restore an archived org to active. */
+export async function restoreTenant(formData: FormData): Promise<void> {
+  const { supabase, user } = await getPlatformContext();
+  const tenantId = String(formData.get("tenantId") ?? "");
+  if (!tenantId) return;
+  await supabase.from("tenants").update({ status: "active" }).eq("id", tenantId);
+  await supabase.from("audit_logs").insert({
+    tenant_id: tenantId,
+    action: "tenant_restored",
+    performed_by: user.id,
+    metadata: {},
+  });
+  revalidatePath(`/platform/tenants/${tenantId}`);
+  revalidatePath("/platform");
+}
