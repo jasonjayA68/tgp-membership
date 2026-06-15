@@ -212,3 +212,116 @@ begin
   if pfx is null then raise exception 'next_member_id: unknown tenant %', tid; end if;
   return pfx || '-' || lpad(seq::text, 4, '0');
 end $$;
+
+-- =============================================================================
+-- Triggers
+-- =============================================================================
+
+-- 1) On signup: create the membership + profile for the user's tenant.
+--    Tenant resolved from metadata (tenant_id → tenant_slug → default 'tgp').
+--    Known fraternal metadata keys are landed into custom_fields.
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  t_id uuid;
+  meta jsonb := coalesce(new.raw_user_meta_data, '{}'::jsonb);
+  cf   jsonb := '{}'::jsonb;
+  k    text;
+  fraternal_keys text[] := array[
+    'alexis_name','batch_name','date_survived',
+    'gt_name','gt_number','mww_name','mww_number','contact_number'
+  ];
+begin
+  if meta ? 'tenant_id' then
+    t_id := (meta ->> 'tenant_id')::uuid;
+  elsif meta ? 'tenant_slug' then
+    select id into t_id from public.tenants where slug = meta ->> 'tenant_slug';
+  end if;
+  if t_id is null then
+    select id into t_id from public.tenants where slug = 'tgp';
+  end if;
+  if t_id is null then
+    return new;  -- no tenants seeded yet; nothing to attach to
+  end if;
+
+  foreach k in array fraternal_keys loop
+    if nullif(meta ->> k, '') is not null then
+      cf := cf || jsonb_build_object(k, meta ->> k);
+    end if;
+  end loop;
+
+  insert into public.tenant_users (tenant_id, user_id, role)
+  values (t_id, new.id, 'member')
+  on conflict (tenant_id, user_id) do nothing;
+
+  insert into public.profiles (tenant_id, user_id, full_name, custom_fields)
+  values (t_id, new.id, coalesce(nullif(meta ->> 'full_name', ''), ''), cf)
+  on conflict (tenant_id, user_id) do nothing;
+
+  return new;
+end $$;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- 2) Guard privileged columns + updated_at + auto member_id on activation.
+create or replace function public.protect_profile_columns()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  uid uuid := auth.uid();
+  caller_is_admin boolean := public.is_tenant_admin(old.tenant_id);
+begin
+  -- tenant_id is immutable.
+  new.tenant_id := old.tenant_id;
+
+  -- NULL uid = trusted server/SQL context. Authenticated non-admins cannot
+  -- change their own standing / member_id / chapter.
+  if uid is not null and not caller_is_admin then
+    new.status     := old.status;
+    new.member_id  := old.member_id;
+    new.chapter_id := old.chapter_id;
+  end if;
+
+  -- Permanent, tenant-prefixed member id the first time a member goes active.
+  if new.status = 'active' and new.member_id is null then
+    new.member_id := public.next_member_id(new.tenant_id);
+  end if;
+
+  new.updated_at := now();
+  return new;
+end $$;
+
+create trigger trg_protect_profile_columns
+  before update on public.profiles
+  for each row execute function public.protect_profile_columns();
+
+-- 3) After a privileged change: write audit logs + provision the NFC card.
+create or replace function public.handle_profile_change()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if new.status is distinct from old.status then
+    insert into public.audit_logs (tenant_id, action, performed_by, target_user, metadata)
+    values (new.tenant_id, 'status_change', auth.uid(), new.user_id,
+            jsonb_build_object('from', old.status, 'to', new.status));
+  end if;
+
+  if new.chapter_id is distinct from old.chapter_id then
+    insert into public.audit_logs (tenant_id, action, performed_by, target_user, metadata)
+    values (new.tenant_id, 'chapter_change', auth.uid(), new.user_id,
+            jsonb_build_object('from', old.chapter_id, 'to', new.chapter_id));
+  end if;
+
+  if new.status = 'active' and new.member_id is not null then
+    insert into public.nfc_cards (tenant_id, profile_id, slug)
+    select new.tenant_id, new.id,
+           lower(new.member_id) || '-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 4)
+    where not exists (select 1 from public.nfc_cards where profile_id = new.id);
+  end if;
+
+  return new;
+end $$;
+
+create trigger trg_handle_profile_change
+  after update on public.profiles
+  for each row execute function public.handle_profile_change();
