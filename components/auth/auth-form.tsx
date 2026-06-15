@@ -17,9 +17,11 @@ const initialState: AuthState = {};
 export function AuthForm({
   mode,
   next,
+  tenant,
 }: {
   mode: "login" | "register";
   next?: string;
+  tenant?: string;
 }) {
   const isRegister = mode === "register";
   const action = isRegister ? signUp : signIn;
@@ -91,7 +93,8 @@ export function AuthForm({
         <FieldError messages={state.fieldErrors?.password} />
       </Field>
 
-      {!isRegister && <input type="hidden" name="next" value={next ?? "/dashboard"} />}
+      <input type="hidden" name="next" value={next ?? "/"} />
+      {tenant && <input type="hidden" name="tenantSlug" value={tenant} />}
 
       <SubmitButton
         size="lg"

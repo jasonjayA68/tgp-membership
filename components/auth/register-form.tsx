@@ -36,7 +36,7 @@ function SectionHeading({
   );
 }
 
-export function RegisterForm() {
+export function RegisterForm({ tenant }: { tenant?: string }) {
   const [state, formAction] = useActionState(signUp, initialState);
   const errors = state.fieldErrors;
 
@@ -66,6 +66,8 @@ export function RegisterForm() {
           <span>{state.error}</span>
         </Alert>
       )}
+
+      {tenant && <input type="hidden" name="tenantSlug" value={tenant} />}
 
       <SectionHeading>Account</SectionHeading>
 

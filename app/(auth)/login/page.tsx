@@ -18,16 +18,18 @@ export const metadata: Metadata = { title: "Sign in" };
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; error?: string }>;
+  searchParams: Promise<{ next?: string; error?: string; tenant?: string }>;
 }) {
-  const { next, error } = await searchParams;
+  const { next, error, tenant } = await searchParams;
 
   return (
     <Card className="mx-auto w-full max-w-md border-gold/30 tgp-frame tgp-glow">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl">Member Sign In</CardTitle>
         <CardDescription>
-          Access your membership portal and digital ID.
+          {tenant
+            ? `Sign in to continue to ${tenant}, or register to join.`
+            : "Access your membership portal and digital ID."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -40,13 +42,17 @@ export default async function LoginPage({
             </span>
           </Alert>
         )}
-        <AuthForm mode="login" next={typeof next === "string" ? next : undefined} />
+        <AuthForm
+          mode="login"
+          next={typeof next === "string" ? next : undefined}
+          tenant={typeof tenant === "string" ? tenant : undefined}
+        />
       </CardContent>
       <CardFooter className="justify-center border-t border-border pt-6">
         <p className="text-sm text-muted-foreground">
           No account yet?{" "}
           <Link
-            href="/register"
+            href={tenant ? `/register?tenant=${encodeURIComponent(tenant)}` : "/register"}
             className="font-medium text-gold underline-offset-4 hover:underline"
           >
             Register
