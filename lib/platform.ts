@@ -7,8 +7,41 @@ import { createClient } from "@/lib/supabase/server";
 import type { Tenant, TenantRole } from "@/lib/types";
 
 /**
+ * Bootstrap allowlist (server-only env). Any email listed in PLATFORM_ADMIN_EMAILS
+ * (comma-separated) is treated as a platform admin WITHOUT a platform_admins row.
+ * This is the standard way to seed the first super admin(s) — it removes the
+ * chicken-and-egg of having to manually insert the very first DB grant, and is
+ * immune to email-string / RLS / session-state pitfalls. DB rows handle the rest.
+ */
+function bootstrapAdminEmails(): Set<string> {
+  return new Set(
+    (process.env.PLATFORM_ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+/** True if this user is a platform admin via the env allowlist OR a DB row. */
+async function checkPlatformAdmin(
+  user: { id: string; email: string | null } | null,
+): Promise<boolean> {
+  if (!user) return false;
+  if (user.email && bootstrapAdminEmails().has(user.email.toLowerCase())) {
+    return true;
+  }
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("platform_admins")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  return Boolean(data);
+}
+
+/**
  * Page/layout guard: require a platform admin. Tenant-independent — it does NOT
- * use getAuth() (which needs an active tenant). No session → /login; an
+ * use getAuth() (which needs an active tenant). No session → /platform/login; an
  * authenticated non-platform-admin → forbidden().
  */
 export async function requirePlatformAdmin(): Promise<{
@@ -17,28 +50,13 @@ export async function requirePlatformAdmin(): Promise<{
 }> {
   const user = await getSessionUser();
   if (!user) redirect("/platform/login");
-
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("platform_admins")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (!data) forbidden();
+  if (!(await checkPlatformAdmin(user))) forbidden();
   return user;
 }
 
 /** Boolean platform-admin check (no redirect) — for conditional UI. */
 export async function isPlatformAdmin(): Promise<boolean> {
-  const user = await getSessionUser();
-  if (!user) return false;
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("platform_admins")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  return Boolean(data);
+  return checkPlatformAdmin(await getSessionUser());
 }
 
 export type TenantWithStats = Tenant & {
