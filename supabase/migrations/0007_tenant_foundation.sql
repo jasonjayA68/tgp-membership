@@ -394,3 +394,71 @@ end $$;
 
 revoke all on function public.get_member_card(text) from public;
 grant execute on function public.get_member_card(text) to anon, authenticated;
+
+-- =============================================================================
+-- Row Level Security  (anon has ZERO direct table access; RPC is the only path)
+-- =============================================================================
+alter table public.tenants             enable row level security;
+alter table public.platform_admins     enable row level security;
+alter table public.tenant_users        enable row level security;
+alter table public.tenant_field_schema enable row level security;
+alter table public.chapters            enable row level security;
+alter table public.profiles            enable row level security;
+alter table public.nfc_cards           enable row level security;
+alter table public.audit_logs          enable row level security;
+alter table public.district_officers   enable row level security;
+
+-- ---- platform_admins (platform operators only) -----------------------------
+create policy platform_admins_select on public.platform_admins for select using (public.is_platform_admin());
+create policy platform_admins_all    on public.platform_admins for all
+  using (public.is_platform_admin()) with check (public.is_platform_admin());
+
+-- ---- tenants ---------------------------------------------------------------
+create policy tenants_select on public.tenants for select using (public.is_tenant_member(id));
+create policy tenants_insert on public.tenants for insert with check (public.is_platform_admin());
+create policy tenants_update on public.tenants for update
+  using (public.is_platform_admin()) with check (public.is_platform_admin());
+create policy tenants_delete on public.tenants for delete using (public.is_platform_admin());
+
+-- ---- tenant_users ----------------------------------------------------------
+create policy tenant_users_select on public.tenant_users for select
+  using (user_id = auth.uid() or public.is_tenant_admin(tenant_id));
+create policy tenant_users_write on public.tenant_users for all
+  using (public.is_tenant_admin(tenant_id)) with check (public.is_tenant_admin(tenant_id));
+
+-- ---- tenant_field_schema ---------------------------------------------------
+create policy tfs_select on public.tenant_field_schema for select using (public.is_tenant_member(tenant_id));
+create policy tfs_write  on public.tenant_field_schema for all
+  using (public.is_tenant_admin(tenant_id)) with check (public.is_tenant_admin(tenant_id));
+
+-- ---- chapters --------------------------------------------------------------
+create policy chapters_select on public.chapters for select using (public.is_tenant_member(tenant_id));
+create policy chapters_write  on public.chapters for all
+  using (public.is_tenant_admin(tenant_id)) with check (public.is_tenant_admin(tenant_id));
+
+-- ---- profiles --------------------------------------------------------------
+create policy profiles_select_own   on public.profiles for select using (user_id = auth.uid());
+create policy profiles_select_admin on public.profiles for select using (public.is_tenant_admin(tenant_id));
+create policy profiles_insert_self  on public.profiles for insert
+  with check (user_id = auth.uid() and public.is_tenant_member(tenant_id) and status = 'pending');
+create policy profiles_update_own   on public.profiles for update
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy profiles_update_admin on public.profiles for update
+  using (public.is_tenant_admin(tenant_id)) with check (public.is_tenant_admin(tenant_id));
+create policy profiles_delete_owner on public.profiles for delete using (public.is_tenant_owner(tenant_id));
+
+-- ---- nfc_cards -------------------------------------------------------------
+create policy nfc_select_own on public.nfc_cards for select using (
+  exists (select 1 from public.profiles p where p.id = nfc_cards.profile_id and p.user_id = auth.uid())
+);
+create policy nfc_select_admin on public.nfc_cards for select using (public.is_tenant_admin(tenant_id));
+create policy nfc_write_admin  on public.nfc_cards for all
+  using (public.is_tenant_admin(tenant_id)) with check (public.is_tenant_admin(tenant_id));
+
+-- ---- audit_logs (read admin; writes only via SECURITY DEFINER triggers) ----
+create policy audit_select_admin on public.audit_logs for select using (public.is_tenant_admin(tenant_id));
+
+-- ---- district_officers -----------------------------------------------------
+create policy district_officers_select on public.district_officers for select using (public.is_tenant_member(tenant_id));
+create policy district_officers_write  on public.district_officers for all
+  using (public.is_tenant_admin(tenant_id)) with check (public.is_tenant_admin(tenant_id));
