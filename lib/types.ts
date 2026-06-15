@@ -31,6 +31,12 @@ export type Tenant = {
   created_at: string;
 };
 
+/** Public whitelist returned by `resolve_tenant_by_slug` — the active-tenant shape. */
+export type ResolvedTenant = Pick<
+  Tenant,
+  "id" | "name" | "slug" | "status" | "logo_url" | "primary_color" | "secondary_color"
+>;
+
 export type PlatformAdmin = { user_id: string; created_at: string };
 
 export type TenantUser = {
@@ -195,6 +201,11 @@ export type Database = {
     Views: { [_ in never]: never };
     Functions: {
       get_member_card: { Args: { card_slug: string }; Returns: MemberCard[] };
+      resolve_tenant_by_slug: {
+        Args: { p_slug: string };
+        Returns: ResolvedTenant[];
+      };
+      join_tenant_by_slug: { Args: { p_slug: string }; Returns: undefined };
       is_platform_admin: { Args: Record<string, never>; Returns: boolean };
       is_tenant_member: { Args: { tid: string }; Returns: boolean };
       is_tenant_admin: { Args: { tid: string }; Returns: boolean };
