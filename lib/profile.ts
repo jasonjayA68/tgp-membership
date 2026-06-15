@@ -16,7 +16,7 @@ export const TGP_FRATERNAL_KEYS = [
   "contact_number",
 ] as const;
 
-type ProfileRow = Profile & {
+export type ProfileRow = Profile & {
   chapter?: Pick<Chapter, "id" | "name" | "district" | "region"> | null;
 };
 

@@ -9,8 +9,7 @@ import { TgpSeal } from "@/components/brand/seal";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { getAuth } from "@/lib/auth";
-import { STATUS_META } from "@/lib/constants";
-import { TENANT_ROLE_META } from "@/lib/constants";
+import { STATUS_META, TENANT_ROLE_META } from "@/lib/constants";
 
 export const metadata: Metadata = { title: "Edit Profile" };
 

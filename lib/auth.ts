@@ -65,7 +65,7 @@ export async function requireUser(): Promise<AuthContext> {
   return auth;
 }
 
-/** Require a tenant admin/owner (or platform admin); redirect/forbid otherwise. */
+/** Require a tenant admin or owner; redirect to /login or forbid otherwise. */
 export async function requireTenantAdmin(): Promise<AuthContext> {
   const auth = await getAuth();
   if (!auth) redirect("/login");

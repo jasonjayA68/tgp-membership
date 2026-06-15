@@ -22,8 +22,22 @@ export type TenantTable =
  */
 export function tdb(supabase: DB, tenantId: string) {
   return {
-    select(table: TenantTable, columns = "*") {
-      return supabase.from(table).select(columns).eq("tenant_id", tenantId);
+    select<T extends TenantTable>(table: T, columns = "*") {
+      // Type `columns` as the literal "*" so PostgREST infers the plain Row of
+      // the narrowed table `T` (so `.eq` accepts that table's columns and
+      // `.data` is typed). The real `columns` string — including embedded-
+      // resource selects — is still sent at runtime; we only suppress
+      // PostgREST's `ParseQuery<Query>` type, whose recursive instantiation over
+      // non-trivial literals is pathologically expensive (it OOMs `tsc`). Call
+      // sites needing a richer row (e.g. an embed) supply it via
+      // `.maybeSingle<T>()`.
+      //
+      // `tenant_id` exists on every `TenantTable` row, but TS can't prove that
+      // for a generic `T`; the filter args are asserted to the builder's own
+      // parameter types (the runtime call is unchanged).
+      const scoped = supabase.from(table).select(columns as "*");
+      type EqArgs = Parameters<typeof scoped.eq>;
+      return scoped.eq(...(["tenant_id", tenantId] as unknown as EqArgs));
     },
     insert(
       table: TenantTable,

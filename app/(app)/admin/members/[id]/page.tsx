@@ -29,9 +29,10 @@ import {
   setMemberRole,
   setMemberStatus,
 } from "@/lib/actions/admin";
-import { getAuth } from "@/lib/auth";
+import { requireTenantAdmin } from "@/lib/auth";
 import { MEMBER_STATUSES, STATUS_META, TENANT_ROLE_META } from "@/lib/constants";
-import { toProfileView } from "@/lib/profile";
+import { toProfileView, type ProfileRow } from "@/lib/profile";
+import { tdb } from "@/lib/supabase/db";
 import type { TenantRole } from "@/lib/types";
 import { getBaseUrl, verificationUrl } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
@@ -71,37 +72,30 @@ export default async function MemberDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const auth = await getAuth();
-  const isOwner = auth?.role === "owner";
+  const auth = await requireTenantAdmin();
+  const isOwner = auth.role === "owner";
+  const db = tdb(supabase, auth.tenant.id);
 
-  const { data: profileRow, error: profileError } = await supabase
-    .from("profiles")
-    .select("*, chapter:chapters!profiles_chapter_id_fkey(*)")
+  const { data: profileRow, error: profileError } = await db
+    .select("profiles", "*, chapter:chapters!profiles_chapter_id_fkey(*)")
     .eq("id", id)
-    .maybeSingle();
+    .maybeSingle<ProfileRow>();
   if (profileError) throw profileError;
   if (!profileRow) notFound();
-  const profile = toProfileView(profileRow as Parameters<typeof toProfileView>[0]);
+  const profile = toProfileView(profileRow);
 
   // The target member's tenant role (for the role <select> default).
-  const { data: targetMembership } = await supabase
-    .from("tenant_users")
-    .select("role")
-    .eq("tenant_id", profile.tenant_id)
+  const { data: targetMembership } = await db
+    .select("tenant_users", "role")
     .eq("user_id", profile.user_id)
-    .maybeSingle();
-  const targetRole = (targetMembership?.role as TenantRole) ?? "member";
+    .maybeSingle<{ role: TenantRole }>();
+  const targetRole = targetMembership?.role ?? "member";
 
   const [chaptersResult, cardResult, logsResult] = await Promise.all([
-    supabase.from("chapters").select("*").order("name"),
-    supabase
-      .from("nfc_cards")
-      .select("*")
-      .eq("profile_id", profile.id)
-      .maybeSingle<NfcCard>(),
-    supabase
-      .from("audit_logs")
-      .select("*")
+    db.select("chapters").order("name"),
+    db.select("nfc_cards").eq("profile_id", profile.id).maybeSingle<NfcCard>(),
+    db
+      .select("audit_logs")
       .eq("target_user", profile.user_id)
       .order("created_at", { ascending: false })
       .limit(8),
