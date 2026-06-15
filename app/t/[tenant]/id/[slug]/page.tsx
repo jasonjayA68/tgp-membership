@@ -158,7 +158,8 @@ export default async function VerifyPage({
     redirect(`/t/${card.tenant_slug}/id/${slug}`);
   }
 
-  // Record the scan exactly once, on the canonical render (active cards only).
+  // Record the scan, once, on the canonical render. The RPC itself no-ops for
+  // inactive cards (its WHERE clause filters `active = true`).
   const supabase = await createClient();
   await supabase.rpc("record_card_scan", { card_slug: slug });
 

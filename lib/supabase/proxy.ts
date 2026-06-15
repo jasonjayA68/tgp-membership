@@ -82,10 +82,15 @@ export async function updateSession(request: NextRequest) {
     if (!slug) return redirect("/", request, response);
     const rest = "/" + segs.slice(2).join("/");
 
-    // Public per-tenant verification (/t/[slug]/id/...) is anonymous — let it
-    // route straight to the verify page (no tenant resolution, no auth gate).
+    // Public per-tenant verification (/t/[slug]/id/...) is anonymous — strip any
+    // spoofed tenant headers and route straight to the verify page (no auth gate).
     if (segs[2] === "id") {
-      return response;
+      const clean = new Headers(request.headers);
+      clean.delete("x-tenant-id");
+      clean.delete("x-tenant-slug");
+      clean.delete("x-tenant-basepath");
+      const passthrough = NextResponse.next({ request: { headers: clean } });
+      return carryCookies(response, passthrough);
     }
 
     const tenant = await resolveTenantForMiddleware(slug);
