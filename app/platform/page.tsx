@@ -1,0 +1,82 @@
+import Link from "next/link";
+import type { Metadata } from "next";
+import { Building2, Settings2, Users } from "lucide-react";
+
+import { CreateTenantForm } from "@/components/platform/create-tenant-form";
+import { TenantStatusBadge } from "@/components/platform/tenant-status-badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { listTenantsWithStats } from "@/lib/platform";
+import { cn } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Platform Console" };
+
+function Stat({ label, value, tone = "muted" }: { label: string; value: number; tone?: "muted" | "gold" }) {
+  return (
+    <Card className="p-4">
+      <div className={cn("tgp-display text-2xl font-bold", tone === "gold" ? "text-gold" : "text-foreground")}>
+        {value}
+      </div>
+      <div className="text-[11px] tracking-widest text-muted-foreground uppercase">{label}</div>
+    </Card>
+  );
+}
+
+export default async function PlatformPage() {
+  const tenants = await listTenantsWithStats();
+  const totalMembers = tenants.reduce((n, t) => n + t.member_count, 0);
+  const totalActive = tenants.reduce((n, t) => n + t.active_count, 0);
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="space-y-6">
+        <div className="grid grid-cols-3 gap-3">
+          <Stat label="Organizations" value={tenants.length} tone="gold" />
+          <Stat label="Total Members" value={totalMembers} />
+          <Stat label="Active Members" value={totalActive} />
+        </div>
+
+        <Card className="divide-y divide-border">
+          {tenants.length === 0 ? (
+            <p className="p-8 text-center text-sm text-muted-foreground">
+              No organizations yet. Create the first one.
+            </p>
+          ) : (
+            tenants.map((t) => (
+              <div key={t.id} className="flex flex-wrap items-center gap-3 p-3">
+                <Building2 className="size-5 text-gold" />
+                <div className="min-w-0 flex-1">
+                  <Link
+                    href={`/platform/tenants/${t.id}`}
+                    className="block truncate font-medium text-foreground hover:text-gold"
+                  >
+                    {t.name}
+                  </Link>
+                  <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                    <span className="tgp-mono">/{t.slug}</span>
+                    <span className="inline-flex items-center gap-1">
+                      <Users className="size-3" />
+                      {t.active_count}/{t.member_count}
+                    </span>
+                  </div>
+                </div>
+                <TenantStatusBadge status={t.status} />
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`/platform/tenants/${t.id}`}>
+                    <Settings2 />
+                    Manage
+                  </Link>
+                </Button>
+              </div>
+            ))
+          )}
+        </Card>
+      </div>
+
+      <Card className="h-fit p-5">
+        <h2 className="tgp-display mb-3 text-sm font-semibold tracking-wide">New organization</h2>
+        <CreateTenantForm />
+      </Card>
+    </div>
+  );
+}
