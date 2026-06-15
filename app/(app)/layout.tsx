@@ -29,7 +29,7 @@ export default async function AppLayout({
       />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
       <footer className="border-t border-border py-6 text-center text-[11px] tracking-widest text-muted-foreground uppercase">
-        {tenant.name}
+        © {tenant.name}
       </footer>
     </div>
   );

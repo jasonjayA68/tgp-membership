@@ -11,7 +11,7 @@ import {
   Sun,
 } from "lucide-react";
 
-import { TgpSeal } from "@/components/brand/seal";
+import { Brandmark } from "@/components/brand/brandmark";
 import { StatusBadge } from "@/components/brand/status-badge";
 import { IdCard, type IdCardData } from "@/components/id-card";
 import { QrCode } from "@/components/qr-code";
@@ -123,7 +123,7 @@ export default async function DashboardPage() {
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 -z-10 scale-[2.1] rounded-full bg-[radial-gradient(circle,color-mix(in_oklab,var(--gold)_38%,transparent),transparent_68%)] blur-xl"
           />
-          <TgpSeal className="size-20 rounded-full tgp-frame tgp-glow sm:size-24" />
+          <Brandmark name={tenant.name} logoUrl={tenant.logo_url} className="size-20 rounded-full tgp-frame tgp-glow sm:size-24" />
         </div>
 
         <p className="tgp-eyebrow text-[10px] text-gold/70 sm:text-[11px]">
@@ -372,7 +372,7 @@ export default async function DashboardPage() {
             </dl>
 
             <div className="flex items-center gap-2.5 border-t border-gold/20 px-5 py-4 text-[11px] text-muted-foreground sm:px-6">
-              <TgpSeal className="size-7 shrink-0 rounded-full" />
+              <Brandmark name={tenant.name} logoUrl={tenant.logo_url} className="size-7 shrink-0 rounded-full" />
               <p className="text-pretty">
                 Recorded and certified by the Tau Gamma Phi digital registry
                 under the seal of the fraternity.

@@ -135,7 +135,7 @@ export function IdCard({
       {/* Footer band */}
       <div className="relative z-10 flex items-center justify-between gap-2 px-5 py-2.5">
         <span className="tgp-mono text-[9px] tracking-wider text-gold/60">
-          {data.memberId ?? "TGP-————"}
+          {data.memberId ?? "—"}
         </span>
         <span className="tgp-eyebrow text-[7px] text-gold/60">{data.orgName}</span>
       </div>

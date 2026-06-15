@@ -27,7 +27,7 @@ export default async function LoginPage({
   const themeStyle = tenantThemeStyle(primary, secondary);
 
   return (
-    <div style={themeStyle} className="flex w-full flex-col items-center">
+    <div style={themeStyle} className="relative isolate flex w-full flex-col items-center">
       <AuthBrandHeader name={brand.name} logoUrl={brand.logoUrl} />
       <Card className="mx-auto w-full max-w-md border-gold/30 tgp-frame tgp-glow">
       <CardHeader className="text-center">

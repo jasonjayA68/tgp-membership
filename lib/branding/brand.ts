@@ -18,6 +18,9 @@ export async function getBrand(): Promise<Brand> {
 }
 
 /** Inline `style` of CSS-variable overrides for a tenant's colors ({} = default). */
+// NOTE: the theme cascades via the wrapper's inline CSS vars, so any future
+// component that portals to document.body (Radix Dialog/Popover/Toast) renders
+// outside the themed subtree and must re-apply this style or portal into it.
 export function tenantThemeStyle(
   primary: string | null,
   secondary: string | null,
