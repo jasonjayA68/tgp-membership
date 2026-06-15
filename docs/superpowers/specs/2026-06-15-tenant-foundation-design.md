@@ -157,18 +157,23 @@ Per table:
 - **tenant_users** — select own rows + tenant admin; write tenant admin or platform admin.
 - **platform_admins** — select/write platform admin only.
 
-## 4. Schema-driven public verification
+## 4. Public verification (tenant-aware, JSONB-sourced, shape-stable)
 
-`get_member_card(card_slug)` rewritten to be tenant-aware and schema-driven:
-1. Resolve tenant from the scanned card.
-2. Return shared core (`full_name, member_id, chapter, district, region, batch_year, status,
-   photo_url, card_active`) + tenant identity (`tenant_name, tenant_slug, logo_url`) +
-   verify-officer contact (chapter officer → district officer fallback; contact read from the
-   officer's `custom_fields->>'contact_number'`).
-3. Return `public_fields jsonb` = the member's `custom_fields` filtered to keys where that
-   tenant's `tenant_field_schema.is_public = true` (ordered by `sort_order`).
+`get_member_card(card_slug)` is rewritten to be **tenant-aware** and to source fraternal values
+from `custom_fields` — but it **keeps its existing return shape** (the same named columns the
+public ID page already consumes: `full_name, member_id, alexis_name, batch_name, date_survived,
+gt_name, gt_number, mww_name, mww_number, chapter, district, region, batch_year, status,
+photo_url, card_active, verify_contact_name, verify_contact_number`). This proves the
+JSONB-backed model end-to-end **without touching `app/id/[slug]/page.tsx`** — honoring the
+"no new UI / TGP unchanged" scope (Decision #5). Internally:
+1. Update scan counters, then resolve the card → profile → tenant.
+2. Read fraternal fields as `custom_fields ->> '<key>'` (date cast for `date_survived`).
+3. Verify-officer contact (chapter officer → district officer fallback) read from the officer's
+   `custom_fields->>'contact_number'`; the district join is scoped by `tenant_id`.
 
-TGP's fraternal fields surface exactly as today — now sourced from JSONB + schema.
+A fully **schema-driven** renderer (generic `public_fields jsonb` filtered by
+`tenant_field_schema.is_public`, with a generic ID page) is **deferred** to the NFC-tenant-aware
+/ CMS sub-projects, where multi-tenant card rendering is actually in scope.
 `revoke all from public; grant execute to anon, authenticated`.
 
 ## 5. Triggers (reworked)
@@ -189,10 +194,15 @@ TGP's fraternal fields surface exactly as today — now sourced from JSONB + sch
 - **`lib/supabase/db.ts`** — `tdb(client, tenantId)` typed wrapper: `.from(table)`
   auto-applies `.eq('tenant_id', …)` on read/update/delete and injects `tenant_id` on insert.
   **All data access goes through it.**
-- **`lib/auth.ts`** — `getAuth()` returns `{ user, activeTenant, role, profile }` (role from
+- **`lib/auth.ts`** — `getAuth()` returns `{ user, tenant, role, profile }` (role from
   `tenant_users`, profile scoped to active tenant). `requireAdmin` → `requireTenantAdmin`.
+- **`lib/profile.ts`** — `toProfileView()` compat shim: flattens `custom_fields` back onto the
+  `ProfileWithChapter` view (named `alexis_name`, etc.) so existing pages keep reading
+  `.alexis_name`; `fraternalToCustomFields()` does the inverse for writes. (Replaced by
+  schema-driven rendering in a later sub-project.)
 - **`lib/constants.ts`, `lib/types.ts`** — role helpers + types updated.
-- **`lib/actions/*`, `app/id/[slug]/page.tsx`** — use `tdb()` + tenant context.
+- **`lib/actions/*`** — use `tdb()`/tenant context; `app/id/[slug]/page.tsx` is **unchanged**
+  (RPC shape preserved).
 
 ## 7. Seeds
 
@@ -206,9 +216,12 @@ TGP's fraternal fields surface exactly as today — now sourced from JSONB + sch
 
 - **New:** `supabase/migrations/0007_tenant_foundation.sql`, `lib/tenant/context.ts`,
   `lib/tenant/types.ts`, `lib/supabase/db.ts`.
+- **New (also):** `lib/profile.ts` (view shim).
 - **Updated:** `lib/auth.ts`, `lib/constants.ts`, `lib/types.ts`, `lib/actions/admin.ts`,
-  `lib/actions/profile.ts`, `lib/actions/auth.ts`, `app/id/[slug]/page.tsx`, and any admin
-  pages reading `profile.role`.
+  `lib/actions/profile.ts`, and the pages reading `profile.role` / fraternal fields
+  (`app/(app)/layout.tsx`, `app/(app)/admin/layout.tsx`, `app/(app)/profile/page.tsx`,
+  `app/(app)/admin/members/[id]/page.tsx`). `lib/actions/auth.ts` and `app/id/[slug]/page.tsx`
+  need **no** changes (signup metadata keys + RPC shape are preserved).
 
 ## 9. Out of scope (later sub-projects)
 
@@ -221,6 +234,6 @@ feature flags (6).
 1. Migration applies clean on a fresh DB; app `next build` passes.
 2. SQL probes as **anon**, **TGP member**, **Org-B member** prove no cross-tenant read; an
    Org-B admin cannot see TGP rows and vice versa.
-3. `get_member_card` for a TGP card returns only TGP data, with fraternal fields intact via
-   `public_fields`.
+3. `get_member_card` for a TGP card returns only TGP data, with fraternal fields intact
+   (sourced from `custom_fields`, same return shape as before).
 4. Existing TGP flows (register → approve → activate → NFC card → public scan) work unchanged.
