@@ -15,7 +15,17 @@ export default async function TenantLoginPage({
 }) {
   const { tenant } = await params;
   const { next, error } = await searchParams;
-  const dest = typeof next === "string" ? next : `/t/${tenant}/dashboard`;
+  // Only accept an internal, non-protocol-relative `next` (prevents open redirect
+  // — this page-load redirect bypasses signIn's safeNext, and Next's redirect()
+  // honors absolute external URLs).
+  const safeNext =
+    typeof next === "string" &&
+    next.startsWith("/") &&
+    !next.startsWith("//") &&
+    !next.startsWith("/\\")
+      ? next
+      : null;
+  const dest = safeNext ?? `/t/${tenant}/dashboard`;
 
   // Already signed in → go straight to the destination.
   if (await getSessionUser()) redirect(dest);
