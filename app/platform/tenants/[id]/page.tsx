@@ -5,6 +5,7 @@ import { ArrowLeft, Power, ShieldCheck } from "lucide-react";
 
 import { AssignOwnerForm } from "@/components/platform/assign-owner-form";
 import { BrandingForm } from "@/components/platform/branding-form";
+import { DomainCard } from "@/components/platform/domain-card";
 import { TenantStatusBadge } from "@/components/platform/tenant-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -123,6 +124,20 @@ export default async function TenantDetailPage({
             logoUrl={tenant.logo_url}
             primaryColor={tenant.primary_color}
             secondaryColor={tenant.secondary_color}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Custom domain</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DomainCard
+            tenantId={tenant.id}
+            domain={tenant.custom_domain}
+            token={tenant.domain_verify_token}
+            verifiedAt={tenant.domain_verified_at}
           />
         </CardContent>
       </Card>
