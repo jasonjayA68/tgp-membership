@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 
+import { AuthBrandHeader } from "@/components/auth/auth-brand-header";
 import { RegisterForm } from "@/components/auth/register-form";
+import { brandForSlug, tenantThemeStyle } from "@/lib/branding/brand";
 import {
   Card,
   CardContent,
@@ -19,9 +21,13 @@ export default async function RegisterPage({
   searchParams: Promise<{ tenant?: string }>;
 }) {
   const { tenant } = await searchParams;
+  const { brand, primary, secondary } = await brandForSlug(tenant);
+  const themeStyle = tenantThemeStyle(primary, secondary);
 
   return (
-    <Card className="mx-auto w-full max-w-2xl border-gold/30 tgp-frame tgp-glow">
+    <div style={themeStyle} className="flex w-full flex-col items-center">
+      <AuthBrandHeader name={brand.name} logoUrl={brand.logoUrl} />
+      <Card className="mx-auto w-full max-w-2xl border-gold/30 tgp-frame tgp-glow">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl">Apply for Membership</CardTitle>
         <CardDescription className="mx-auto max-w-md">
@@ -43,6 +49,7 @@ export default async function RegisterPage({
           </Link>
         </p>
       </CardFooter>
-    </Card>
+      </Card>
+    </div>
   );
 }

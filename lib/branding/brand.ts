@@ -4,7 +4,9 @@ import type { CSSProperties } from "react";
 
 import { buildTenantTheme } from "@/lib/branding/theme";
 import { SITE } from "@/lib/constants";
+import { createClient } from "@/lib/supabase/server";
 import { getActiveTenant } from "@/lib/tenant/context";
+import type { ResolvedTenant } from "@/lib/types";
 
 export type Brand = { name: string; logoUrl: string | null };
 
@@ -21,4 +23,23 @@ export function tenantThemeStyle(
   secondary: string | null,
 ): CSSProperties {
   return buildTenantTheme(primary, secondary) as CSSProperties;
+}
+
+/** Resolve a tenant's public brand by slug (for ?tenant auth pages). Null → platform default. */
+export async function brandForSlug(
+  slug: string | undefined,
+): Promise<{ brand: Brand; primary: string | null; secondary: string | null }> {
+  if (slug) {
+    const supabase = await createClient();
+    const { data } = await supabase.rpc("resolve_tenant_by_slug", { p_slug: slug });
+    const t = data?.[0] as ResolvedTenant | undefined;
+    if (t) {
+      return {
+        brand: { name: t.name, logoUrl: t.logo_url },
+        primary: t.primary_color,
+        secondary: t.secondary_color,
+      };
+    }
+  }
+  return { brand: { name: SITE.name, logoUrl: null }, primary: null, secondary: null };
 }

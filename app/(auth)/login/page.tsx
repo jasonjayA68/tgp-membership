@@ -2,7 +2,9 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { CircleAlert } from "lucide-react";
 
+import { AuthBrandHeader } from "@/components/auth/auth-brand-header";
 import { AuthForm } from "@/components/auth/auth-form";
+import { brandForSlug, tenantThemeStyle } from "@/lib/branding/brand";
 import { Alert } from "@/components/ui/alert";
 import {
   Card,
@@ -21,9 +23,13 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string; error?: string; tenant?: string }>;
 }) {
   const { next, error, tenant } = await searchParams;
+  const { brand, primary, secondary } = await brandForSlug(tenant);
+  const themeStyle = tenantThemeStyle(primary, secondary);
 
   return (
-    <Card className="mx-auto w-full max-w-md border-gold/30 tgp-frame tgp-glow">
+    <div style={themeStyle} className="flex w-full flex-col items-center">
+      <AuthBrandHeader name={brand.name} logoUrl={brand.logoUrl} />
+      <Card className="mx-auto w-full max-w-md border-gold/30 tgp-frame tgp-glow">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl">Member Sign In</CardTitle>
         <CardDescription>
@@ -59,6 +65,7 @@ export default async function LoginPage({
           </Link>
         </p>
       </CardFooter>
-    </Card>
+      </Card>
+    </div>
   );
 }
