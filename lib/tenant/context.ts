@@ -1,27 +1,30 @@
 import "server-only";
 
 import { cache } from "react";
+import { headers } from "next/headers";
 
 import { createClient } from "@/lib/supabase/server";
-import type { Tenant } from "@/lib/types";
+import type { ResolvedTenant } from "@/lib/types";
 
 /**
- * Default tenant for the foundation phase. Real per-request resolution
- * (custom domain / `/t/[slug]`) arrives in Sub-project 2 — this function is
- * the seam it will replace.
+ * The active tenant for the current request, resolved from the trusted
+ * `x-tenant-slug` header that middleware injects (after stripping any
+ * client-supplied value). Returns null on global routes (no tenant context).
+ * Memoised per request.
  */
-export const DEFAULT_TENANT_SLUG = "tgp";
+export const getActiveTenant = cache(async (): Promise<ResolvedTenant | null> => {
+  const slug = (await headers()).get("x-tenant-slug");
+  if (!slug) return null;
 
-/** The active tenant for the current request. Memoised per request. */
-export const getActiveTenant = cache(async (): Promise<Tenant> => {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("tenants")
-    .select("*")
-    .eq("slug", DEFAULT_TENANT_SLUG)
-    .single();
-  if (error) {
-    throw new Error(`Active tenant "${DEFAULT_TENANT_SLUG}" not found: ${error.message}`);
-  }
-  return data as Tenant;
+  const { data, error } = await supabase.rpc("resolve_tenant_by_slug", {
+    p_slug: slug,
+  });
+  if (error || !data?.[0]) return null;
+  return data[0] as ResolvedTenant;
 });
+
+/** The active tenant's link base path (e.g. "/t/tgp"; "" on a custom domain). */
+export async function getActiveTenantBasePath(): Promise<string> {
+  return (await headers()).get("x-tenant-basepath") ?? "";
+}
