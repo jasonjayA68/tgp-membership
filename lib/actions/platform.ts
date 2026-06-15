@@ -1,8 +1,13 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
+import { promises as dns } from "node:dns";
+
 import { revalidatePath } from "next/cache";
 
+import { env } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
+import { isCanonicalHost, normalizeHost } from "@/lib/tenant/host";
 import type { TenantStatus } from "@/lib/types";
 
 export type PlatformState = { error?: string; notice?: string };
@@ -123,4 +128,106 @@ export async function updateTenantBranding(
   if (error) return { error: error.message };
   revalidatePath(`/platform/tenants/${tenantId}`);
   return { notice: "Branding updated." };
+}
+
+/** Set (or replace) a tenant's custom domain; generates a fresh verify token. */
+export async function setCustomDomain(
+  _prev: PlatformState,
+  formData: FormData,
+): Promise<PlatformState> {
+  const { supabase } = await getPlatformContext();
+  const tenantId = String(formData.get("tenantId") ?? "");
+  if (!tenantId) return { error: "Missing tenant." };
+
+  const domain = normalizeHost(String(formData.get("domain") ?? ""));
+  if (!domain || !domain.includes(".")) {
+    return { error: "Enter a valid domain, e.g. members.acme.org." };
+  }
+  if (isCanonicalHost(domain, env.APP_HOST)) {
+    return { error: "That host is reserved by the platform." };
+  }
+
+  const token = randomBytes(16).toString("hex");
+  const { error } = await supabase
+    .from("tenants")
+    .update({
+      custom_domain: domain,
+      domain_verify_token: token,
+      domain_verified_at: null,
+    })
+    .eq("id", tenantId);
+  if (error) {
+    if (error.code === "23505") {
+      return { error: "That domain is already in use by another tenant." };
+    }
+    return { error: error.message };
+  }
+  revalidatePath(`/platform/tenants/${tenantId}`);
+  return { notice: "Domain saved. Add the TXT record, then verify." };
+}
+
+/** Verify domain ownership via a DNS TXT record (_tgp-verify.<domain>). */
+export async function verifyCustomDomain(
+  _prev: PlatformState,
+  formData: FormData,
+): Promise<PlatformState> {
+  const { supabase } = await getPlatformContext();
+  const tenantId = String(formData.get("tenantId") ?? "");
+  if (!tenantId) return { error: "Missing tenant." };
+
+  const { data: tenant, error: readErr } = await supabase
+    .from("tenants")
+    .select("custom_domain, domain_verify_token")
+    .eq("id", tenantId)
+    .maybeSingle<{ custom_domain: string | null; domain_verify_token: string | null }>();
+  if (readErr) return { error: readErr.message };
+  if (!tenant?.custom_domain || !tenant.domain_verify_token) {
+    return { error: "Save a domain first." };
+  }
+
+  let records: string[][] = [];
+  try {
+    records = await dns.resolveTxt(`_tgp-verify.${tenant.custom_domain}`);
+  } catch {
+    return {
+      error: "TXT record not found yet — DNS can take a few minutes to propagate.",
+    };
+  }
+  // A TXT value may be split into multiple chunks; join each record before comparing.
+  const matched = records.some(
+    (chunks) => chunks.join("").trim() === tenant.domain_verify_token,
+  );
+  if (!matched) {
+    return { error: "Found a TXT record but the token doesn't match yet." };
+  }
+
+  const { error } = await supabase
+    .from("tenants")
+    .update({ domain_verified_at: new Date().toISOString() })
+    .eq("id", tenantId);
+  if (error) return { error: error.message };
+  revalidatePath(`/platform/tenants/${tenantId}`);
+  return { notice: "Domain verified — it's now live." };
+}
+
+/** Remove a tenant's custom domain and clear verification state. */
+export async function removeCustomDomain(
+  _prev: PlatformState,
+  formData: FormData,
+): Promise<PlatformState> {
+  const { supabase } = await getPlatformContext();
+  const tenantId = String(formData.get("tenantId") ?? "");
+  if (!tenantId) return { error: "Missing tenant." };
+
+  const { error } = await supabase
+    .from("tenants")
+    .update({
+      custom_domain: null,
+      domain_verify_token: null,
+      domain_verified_at: null,
+    })
+    .eq("id", tenantId);
+  if (error) return { error: error.message };
+  revalidatePath(`/platform/tenants/${tenantId}`);
+  return { notice: "Custom domain removed." };
 }
