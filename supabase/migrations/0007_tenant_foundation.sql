@@ -169,3 +169,46 @@ create table public.district_officers (
   created_at timestamptz not null default now(),
   unique (tenant_id, district)
 );
+
+-- =============================================================================
+-- Isolation helpers (SECURITY DEFINER → bypass RLS → no policy recursion)
+-- =============================================================================
+create or replace function public.is_platform_admin()
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.platform_admins where user_id = auth.uid())
+$$;
+
+create or replace function public.is_tenant_member(tid uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select public.is_platform_admin()
+      or exists (select 1 from public.tenant_users
+                  where user_id = auth.uid() and tenant_id = tid)
+$$;
+
+create or replace function public.is_tenant_admin(tid uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select public.is_platform_admin()
+      or exists (select 1 from public.tenant_users
+                  where user_id = auth.uid() and tenant_id = tid
+                    and role in ('owner', 'admin'))
+$$;
+
+create or replace function public.is_tenant_owner(tid uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select public.is_platform_admin()
+      or exists (select 1 from public.tenant_users
+                  where user_id = auth.uid() and tenant_id = tid and role = 'owner')
+$$;
+
+-- Per-tenant member numbering: <prefix>-NNNN (atomic via UPDATE ... RETURNING).
+create or replace function public.next_member_id(tid uuid)
+returns text language plpgsql volatile security definer set search_path = public as $$
+declare seq int; pfx text;
+begin
+  update public.tenants
+     set member_seq = member_seq + 1
+   where id = tid
+   returning member_seq, member_id_prefix into seq, pfx;
+  if pfx is null then raise exception 'next_member_id: unknown tenant %', tid; end if;
+  return pfx || '-' || lpad(seq::text, 4, '0');
+end $$;
