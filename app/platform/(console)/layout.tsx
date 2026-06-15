@@ -1,5 +1,8 @@
 import Link from "next/link";
+import { LogOut } from "lucide-react";
 
+import { signOut } from "@/lib/actions/auth";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { requirePlatformAdmin } from "@/lib/platform";
 
 export default async function PlatformLayout({
@@ -16,7 +19,15 @@ export default async function PlatformLayout({
           <Link href="/platform" className="tgp-display text-lg font-bold tracking-wide">
             Platform Console
           </Link>
-          <span className="tgp-eyebrow text-[10px] text-gold/70">Super Admin</span>
+          <div className="flex items-center gap-3">
+            <span className="tgp-eyebrow text-[10px] text-gold/70">Super Admin</span>
+            <form action={signOut}>
+              <SubmitButton size="sm" variant="ghost" pendingText="…">
+                <LogOut />
+                Sign out
+              </SubmitButton>
+            </form>
+          </div>
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
