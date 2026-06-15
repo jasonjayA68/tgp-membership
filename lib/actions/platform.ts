@@ -306,17 +306,13 @@ export async function restoreTenant(formData: FormData): Promise<void> {
   revalidatePath("/platform");
 }
 
-const LOGO_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/svg+xml",
-]);
+// SVG is intentionally excluded: the branding bucket is public-read, and an SVG
+// with embedded <script> served from its public URL is a stored-XSS vector.
+const LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const LOGO_EXT: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
   "image/webp": "webp",
-  "image/svg+xml": "svg",
 };
 
 /** Upload a tenant logo to the `branding` bucket and store its public URL. */
@@ -333,7 +329,7 @@ export async function uploadTenantLogo(
     return { error: "Choose a logo image to upload." };
   }
   if (!LOGO_TYPES.has(file.type)) {
-    return { error: "Logo must be a PNG, JPG, WebP, or SVG." };
+    return { error: "Logo must be a PNG, JPG, or WebP." };
   }
   if (file.size > 2 * 1024 * 1024) {
     return { error: "Logo must be 2 MB or smaller." };
