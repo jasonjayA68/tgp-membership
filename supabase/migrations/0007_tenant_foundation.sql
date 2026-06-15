@@ -462,3 +462,95 @@ create policy audit_select_admin on public.audit_logs for select using (public.i
 create policy district_officers_select on public.district_officers for select using (public.is_tenant_member(tenant_id));
 create policy district_officers_write  on public.district_officers for all
   using (public.is_tenant_admin(tenant_id)) with check (public.is_tenant_admin(tenant_id));
+
+-- =============================================================================
+-- Storage: member photos (public-read bucket, owner-scoped writes)
+-- =============================================================================
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+drop policy if exists avatars_public_read on storage.objects;
+drop policy if exists avatars_insert_own  on storage.objects;
+drop policy if exists avatars_update_own  on storage.objects;
+drop policy if exists avatars_delete_own  on storage.objects;
+
+create policy avatars_public_read on storage.objects for select using (bucket_id = 'avatars');
+create policy avatars_insert_own on storage.objects for insert with check (
+  bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text
+);
+create policy avatars_update_own on storage.objects for update using (
+  bucket_id = 'avatars'
+  and ((storage.foldername(name))[1] = auth.uid()::text or public.is_platform_admin())
+);
+create policy avatars_delete_own on storage.objects for delete using (
+  bucket_id = 'avatars'
+  and ((storage.foldername(name))[1] = auth.uid()::text or public.is_platform_admin())
+);
+
+-- =============================================================================
+-- Seeds
+-- =============================================================================
+-- TGP — tenant #1
+insert into public.tenants (name, slug, member_id_prefix)
+values ('Tau Gamma Phi', 'tgp', 'TGP')
+on conflict (slug) do nothing;
+
+-- TGP councils
+insert into public.chapters (tenant_id, name, region)
+select t.id, c.name, c.region
+from public.tenants t,
+     (values
+       ('Tau Gamma Phi — National Headquarters', 'National'),
+       ('Northern Luzon Council',                'Luzon'),
+       ('Metro Manila Council',                  'NCR'),
+       ('Southern Luzon Council',                'Luzon'),
+       ('Visayas Council',                       'Visayas'),
+       ('Mindanao Council',                      'Mindanao')
+     ) as c(name, region)
+where t.slug = 'tgp'
+on conflict (tenant_id, name) do nothing;
+
+-- TGP fraternal field schema (is_public mirrors current public exposure:
+-- contact_number is NOT publicly shown — it only feeds verify-officer contact).
+insert into public.tenant_field_schema (tenant_id, key, label, type, is_public, sort_order)
+select t.id, f.key, f.label, f.type, f.is_public, f.sort_order
+from public.tenants t,
+     (values
+       ('alexis_name',    'Alexis Name',           'text',  true,  1),
+       ('batch_name',     'Batch Name',            'text',  true,  2),
+       ('date_survived',  'Date Survived',         'date',  true,  3),
+       ('gt_name',        'Grand Triskelion (GT)', 'text',  true,  4),
+       ('gt_number',      'GT Number',             'phone', true,  5),
+       ('mww_name',       'MWW',                   'text',  true,  6),
+       ('mww_number',     'MWW Number',            'phone', true,  7),
+       ('contact_number', 'Contact Number',        'phone', false, 8)
+     ) as f(key, label, type, is_public, sort_order)
+where t.slug = 'tgp'
+on conflict (tenant_id, key) do nothing;
+
+-- Org-B — throwaway second tenant to prove isolation
+insert into public.tenants (name, slug, member_id_prefix)
+values ('Org B (test)', 'org-b', 'ORG')
+on conflict (slug) do nothing;
+
+insert into public.tenant_field_schema (tenant_id, key, label, type, is_public, sort_order)
+select t.id, 'employee_no', 'Employee No', 'text', true, 1
+from public.tenants t where t.slug = 'org-b'
+on conflict (tenant_id, key) do nothing;
+
+-- =============================================================================
+-- Bootstrap your first platform admin + TGP owner (replaces old super_admin step)
+-- -----------------------------------------------------------------------------
+-- 1. Register an account at /register (creates a TGP 'member' membership).
+-- 2. Run (replace the email):
+--
+--   with u as (select id from auth.users where email = 'you@example.com')
+--   insert into public.platform_admins (user_id) select id from u
+--     on conflict do nothing;
+--
+--   with u as (select id from auth.users where email = 'you@example.com'),
+--        t as (select id from public.tenants where slug = 'tgp')
+--   update public.tenant_users tu set role = 'owner'
+--     from u, t where tu.user_id = u.id and tu.tenant_id = t.id;
+-- =============================================================================
