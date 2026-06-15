@@ -2,50 +2,47 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { env } from "@/lib/env";
+import { resolveTenantForMiddleware } from "@/lib/tenant/resolve";
 
-/**
- * Paths reachable without authentication. Everything else requires a session.
- * `/id` is the public NFC verification surface; `/auth` handles email links.
- */
-const PUBLIC_PREFIXES = [
-  "/",
-  "/login",
-  "/register",
-  "/auth",
-  "/id",
-  "/forbidden",
-  "/unauthorized",
-];
+/** Bare workspace paths that are only valid under /t/[slug] in subpath mode. */
+const WORKSPACE_PREFIXES = ["/dashboard", "/admin", "/profile"];
 
-function isPublic(pathname: string): boolean {
-  return PUBLIC_PREFIXES.some(
+function matches(prefixes: string[], pathname: string): boolean {
+  return prefixes.some(
     (p) => pathname === p || pathname.startsWith(p === "/" ? "/?" : p + "/"),
   );
 }
 
-/** Build a redirect that carries over any refreshed auth cookies. */
-function redirect(
-  pathname: string,
-  request: NextRequest,
-  carry: NextResponse,
-  withNext = false,
-) {
-  const url = request.nextUrl.clone();
-  url.pathname = pathname;
-  url.search = "";
-  if (withNext && request.nextUrl.pathname !== "/") {
-    url.searchParams.set("next", request.nextUrl.pathname);
-  }
-  const response = NextResponse.redirect(url);
-  for (const cookie of carry.cookies.getAll()) response.cookies.set(cookie);
-  return response;
+/** Copy refreshed Supabase auth cookies from one response onto another. */
+function carryCookies(from: NextResponse, to: NextResponse) {
+  for (const cookie of from.cookies.getAll()) to.cookies.set(cookie);
+  return to;
 }
 
-/**
- * Refreshes the Supabase session on every request and performs an optimistic
- * (cookie-only) auth gate. Authoritative role checks still happen in Server
- * Components/Actions — this just keeps tokens fresh and blocks the obvious cases.
- */
+function redirect(to: string, request: NextRequest, carry: NextResponse) {
+  const url = request.nextUrl.clone();
+  const [pathname, search = ""] = to.split("?");
+  url.pathname = pathname;
+  url.search = search;
+  return carryCookies(carry, NextResponse.redirect(url));
+}
+
+function rewrite(
+  to: string,
+  request: NextRequest,
+  carry: NextResponse,
+  requestHeaders?: Headers,
+) {
+  const url = request.nextUrl.clone();
+  url.pathname = to;
+  url.search = request.nextUrl.search;
+  const res = NextResponse.rewrite(
+    url,
+    requestHeaders ? { request: { headers: requestHeaders } } : undefined,
+  );
+  return carryCookies(carry, res);
+}
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -62,7 +59,6 @@ export async function updateSession(request: NextRequest) {
         for (const { name, value, options } of cookiesToSet) {
           response.cookies.set(name, value, options);
         }
-        // v0.12 passes anti-cache headers that must ride along with Set-Cookie.
         if (headers) {
           for (const [key, value] of Object.entries(headers)) {
             response.headers.set(key, value);
@@ -79,12 +75,64 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
 
-  if (!user && !isPublic(path)) {
-    return redirect("/login", request, response, true);
+  // ---- Tenant-scoped routes: /t/[slug]/<rest> -------------------------------
+  if (path === "/t" || path.startsWith("/t/")) {
+    const segs = path.split("/").filter(Boolean); // ["t", slug, ...rest]
+    const slug = segs[1];
+    if (!slug) return redirect("/", request, response);
+    const rest = "/" + segs.slice(2).join("/");
+
+    const tenant = await resolveTenantForMiddleware(slug);
+    if (!tenant) return rewrite("/workspace-not-found", request, response);
+    if (tenant.status === "suspended")
+      return rewrite("/workspace-suspended", request, response);
+
+    // Logged-out → carry tenant + return path to the global login.
+    if (!user) {
+      return redirect(
+        `/login?tenant=${encodeURIComponent(slug)}&next=${encodeURIComponent(path)}`,
+        request,
+        response,
+      );
+    }
+
+    // Inject trusted tenant headers (after stripping any client-supplied ones).
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.delete("x-tenant-id");
+    requestHeaders.delete("x-tenant-slug");
+    requestHeaders.delete("x-tenant-basepath");
+    requestHeaders.set("x-tenant-id", tenant.id);
+    requestHeaders.set("x-tenant-slug", tenant.slug);
+    requestHeaders.set("x-tenant-basepath", `/t/${tenant.slug}`);
+
+    return rewrite(
+      rest === "/" ? "/dashboard" : rest,
+      request,
+      response,
+      requestHeaders,
+    );
   }
 
+  // ---- Bare workspace path hit directly (no tenant) → workspace list --------
+  if (matches(WORKSPACE_PREFIXES, path)) {
+    return redirect("/", request, response);
+  }
+
+  // ---- Global routes --------------------------------------------------------
   if (user && (path === "/login" || path === "/register")) {
-    return redirect("/dashboard", request, response);
+    return redirect("/", request, response);
+  }
+  // Strip any spoofed tenant headers on global routes too.
+  if (
+    request.headers.has("x-tenant-id") ||
+    request.headers.has("x-tenant-slug")
+  ) {
+    const clean = new Headers(request.headers);
+    clean.delete("x-tenant-id");
+    clean.delete("x-tenant-slug");
+    clean.delete("x-tenant-basepath");
+    const next = NextResponse.next({ request: { headers: clean } });
+    return carryCookies(response, next);
   }
 
   return response;
