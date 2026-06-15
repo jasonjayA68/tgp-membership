@@ -11,9 +11,11 @@ import {
   ShieldX,
 } from "lucide-react";
 
+import { Brandmark } from "@/components/brand/brandmark";
 import { StatusBadge } from "@/components/brand/status-badge";
 import { Avatar } from "@/components/ui/avatar";
 import { NotRecognizedCard } from "@/components/verify/not-recognized";
+import { tenantThemeStyle } from "@/lib/branding/brand";
 import { createClient } from "@/lib/supabase/server";
 import type { MemberCard, PublicField } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -126,9 +128,18 @@ function DetailRow({
   );
 }
 
-function PageShell({ children }: { children: React.ReactNode }) {
+function PageShell({
+  children,
+  style,
+}: {
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
   return (
-    <main className="relative flex min-h-svh flex-col items-center justify-center px-4 py-10">
+    <main
+      style={style}
+      className="relative flex min-h-svh flex-col items-center justify-center bg-background px-4 py-10"
+    >
       <div className="w-full max-w-sm">{children}</div>
       <p className="mt-6 max-w-sm text-center text-[11px] leading-relaxed text-muted-foreground">
         Official digital membership verification record.
@@ -163,6 +174,8 @@ export default async function VerifyPage({
   const supabase = await createClient();
   await supabase.rpc("record_card_scan", { card_slug: slug });
 
+  const themeStyle = tenantThemeStyle(card.tenant_primary_color, card.tenant_secondary_color);
+
   const banner = bannerFor(card);
   const BannerIcon = banner.icon;
   const verifiedAt = new Intl.DateTimeFormat("en-US", {
@@ -172,7 +185,7 @@ export default async function VerifyPage({
   const hasChapter = card.chapter || card.district || card.region;
 
   return (
-    <PageShell>
+    <PageShell style={themeStyle}>
       <article className="group relative isolate overflow-hidden rounded-2xl bg-card tgp-frame tgp-glow">
         <div
           className="pointer-events-none absolute inset-0 tgp-guilloche opacity-60"
@@ -182,18 +195,7 @@ export default async function VerifyPage({
         {/* Document header — tenant identity */}
         <div className="relative z-10 flex items-center justify-between gap-3 border-b border-gold/30 bg-gradient-to-r from-gold/15 via-gold/5 to-transparent px-5 py-3">
           <div className="flex items-center gap-2.5">
-            {card.tenant_logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={card.tenant_logo_url}
-                alt=""
-                className="size-9 rounded-full object-cover ring-1 ring-gold/40"
-              />
-            ) : (
-              <span className="flex size-9 items-center justify-center rounded-full bg-ink ring-1 ring-gold/40">
-                <ShieldCheck className="size-5 text-gold" aria-hidden="true" />
-              </span>
-            )}
+            <Brandmark name={card.tenant_name} logoUrl={card.tenant_logo_url} className="size-9" />
             <div className="leading-tight">
               <p className="tgp-display text-[12px] font-bold tracking-[0.14em] text-foreground">
                 {card.tenant_name}
