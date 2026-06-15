@@ -65,10 +65,20 @@ function readableOn(bg: RGB): RGB {
   return contrast(PURE_WHITE, bg) >= contrast(PURE_BLACK, bg) ? PURE_WHITE : PURE_BLACK;
 }
 
-/** Nudge `color` toward `fg` until it's legible (>= floor) as text on `surf`. */
-function legibleOn(color: RGB, surf: RGB, fg: RGB, floor = FLOOR): RGB {
+function roundRGB({ r, g, b }: RGB): RGB {
+  return {
+    r: Math.round(clamp(r, 0, 255)),
+    g: Math.round(clamp(g, 0, 255)),
+    b: Math.round(clamp(b, 0, 255)),
+  };
+}
+
+/** Nudge `color` toward the highest-contrast pure extreme until the EMITTED
+ * (rounded) color is legible (>= floor) on `surf`. */
+function legibleOn(color: RGB, surf: RGB, floor = FLOOR): RGB {
+  const target = contrast(PURE_WHITE, surf) >= contrast(PURE_BLACK, surf) ? PURE_WHITE : PURE_BLACK;
   let c = color;
-  for (let i = 0; i < 16 && contrast(c, surf) < floor; i++) c = mix(c, fg, 0.12);
+  for (let i = 0; i < 40 && contrast(roundRGB(c), surf) < floor; i++) c = mix(c, target, 0.1);
   return c;
 }
 
@@ -88,7 +98,7 @@ export function buildTenantTheme(primary: string | null, secondary: string | nul
   const borderT = light ? 0.26 : 0.16;
 
   // Accent corrected to be legible as text/icon on the surface.
-  const gold = legibleOn(acc, surf, fg);
+  const gold = legibleOn(acc, surf);
 
   return {
     "--background": toHex(surf),
@@ -100,7 +110,7 @@ export function buildTenantTheme(primary: string | null, secondary: string | nul
     "--secondary": toHex(mix(surf, fg, light ? 0.12 : 0.08)),
     "--secondary-foreground": toHex(fg),
     "--muted": toHex(mix(surf, fg, light ? 0.07 : 0.04)),
-    "--muted-foreground": toHex(legibleOn(mix(fg, surf, 0.35), surf, fg)),
+    "--muted-foreground": toHex(legibleOn(mix(fg, surf, 0.35), surf)),
     "--accent": toHex(mix(surf, acc, 0.15)),
     "--accent-foreground": toHex(gold),
     "--border": toHex(mix(surf, fg, borderT)),
