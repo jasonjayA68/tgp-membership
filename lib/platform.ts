@@ -22,21 +22,30 @@ function bootstrapAdminEmails(): Set<string> {
   );
 }
 
-/** True if this user is a platform admin via the env allowlist OR a DB row. */
+/** True if this user is a platform admin (DB row), self-healing a bootstrap row
+ *  from the session when the user is env-allowlisted but not yet in the table. */
 async function checkPlatformAdmin(
   user: { id: string; email: string | null } | null,
 ): Promise<boolean> {
   if (!user) return false;
-  if (user.email && bootstrapAdminEmails().has(user.email.toLowerCase())) {
-    return true;
-  }
   const supabase = await createClient();
+
   const { data } = await supabase
     .from("platform_admins")
     .select("user_id")
     .eq("user_id", user.id)
     .maybeSingle();
-  return Boolean(data);
+  if (data) return true;
+
+  // Env-allowlisted but no DB row yet → self-heal via the bootstrap RPC, which
+  // inserts auth.uid() (no email-string matching) so the DB is_platform_admin()
+  // check used by RLS + RPCs starts returning true. Safe: it only succeeds while
+  // no other admin exists. If the RPC isn't applied yet, this is a no-op.
+  if (user.email && bootstrapAdminEmails().has(user.email.toLowerCase())) {
+    const { data: claimed } = await supabase.rpc("claim_platform_admin");
+    return claimed === true;
+  }
+  return false;
 }
 
 /**
