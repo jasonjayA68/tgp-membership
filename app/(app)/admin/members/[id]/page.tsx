@@ -30,6 +30,8 @@ import {
   setMemberStatus,
 } from "@/lib/actions/admin";
 import { requireTenantAdmin } from "@/lib/auth";
+import { getActiveTenantBasePath } from "@/lib/tenant/context";
+import { tenantHref } from "@/lib/tenant/links";
 import { MEMBER_STATUSES, STATUS_META, TENANT_ROLE_META } from "@/lib/constants";
 import { toProfileView, type ProfileRow } from "@/lib/profile";
 import { tdb } from "@/lib/supabase/db";
@@ -73,6 +75,7 @@ export default async function MemberDetailPage({
   const supabase = await createClient();
 
   const auth = await requireTenantAdmin();
+  const basePath = await getActiveTenantBasePath();
   const isOwner = auth.role === "owner";
   const db = tdb(supabase, auth.tenant.id);
 
@@ -147,7 +150,7 @@ export default async function MemberDetailPage({
   return (
     <div className="space-y-6">
       <Button asChild variant="ghost" size="sm">
-        <Link href="/admin">
+        <Link href={tenantHref(basePath, "/admin")}>
           <ArrowLeft />
           All members
         </Link>

@@ -12,6 +12,8 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { setMemberStatus } from "@/lib/actions/admin";
 import { MEMBER_STATUSES, STATUS_META } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
+import { getActiveTenantBasePath } from "@/lib/tenant/context";
+import { tenantHref } from "@/lib/tenant/links";
 import type { MemberStatus, ProfileWithChapter } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -53,6 +55,7 @@ export default async function AdminMembersPage({
 }) {
   const { status, q } = await searchParams;
   const supabase = await createClient();
+  const basePath = await getActiveTenantBasePath();
 
   const statusFilter = MEMBER_STATUSES.find((s) => s === status);
   // Strip PostgREST filter metacharacters to prevent filter injection.
@@ -131,7 +134,7 @@ export default async function AdminMembersPage({
         </Button>
         {(safeQuery || statusFilter) && (
           <Button asChild variant="ghost">
-            <Link href="/admin">Clear</Link>
+            <Link href={tenantHref(basePath, "/admin")}>Clear</Link>
           </Button>
         )}
       </form>
@@ -143,7 +146,7 @@ export default async function AdminMembersPage({
           </p>
         ) : (
           members.map((member) => (
-            <MemberRow key={member.id} member={member} />
+            <MemberRow key={member.id} member={member} basePath={basePath} />
           ))
         )}
       </Card>
@@ -151,7 +154,13 @@ export default async function AdminMembersPage({
   );
 }
 
-function MemberRow({ member }: { member: ProfileWithChapter }) {
+function MemberRow({
+  member,
+  basePath,
+}: {
+  member: ProfileWithChapter;
+  basePath: string;
+}) {
   return (
     <div className="flex flex-wrap items-center gap-3 p-3">
       <Avatar
@@ -162,7 +171,7 @@ function MemberRow({ member }: { member: ProfileWithChapter }) {
       />
       <div className="min-w-0 flex-1">
         <Link
-          href={`/admin/members/${member.id}`}
+          href={tenantHref(basePath, `/admin/members/${member.id}`)}
           className="block truncate font-medium text-foreground hover:text-gold"
         >
           {member.full_name || "Unnamed member"}
@@ -194,7 +203,7 @@ function MemberRow({ member }: { member: ProfileWithChapter }) {
           </>
         )}
         <Button asChild size="sm" variant="outline">
-          <Link href={`/admin/members/${member.id}`}>
+          <Link href={tenantHref(basePath, `/admin/members/${member.id}`)}>
             <Settings2 />
             Manage
           </Link>
