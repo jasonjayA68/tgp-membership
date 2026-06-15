@@ -17,9 +17,11 @@ const BASE_LINKS = [
 export function AppNav({
   basePath,
   isAdmin,
+  brand,
 }: {
   basePath: string;
   isAdmin: boolean;
+  brand: { name: string; logoUrl: string | null };
 }) {
   const pathname = usePathname();
   const links = isAdmin
@@ -29,11 +31,8 @@ export function AppNav({
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4">
-        <Link
-          href={tenantHref(basePath, "/dashboard")}
-          aria-label="Workspace home"
-        >
-          <Wordmark showRegistry={false} sealClassName="size-9" />
+        <Link href={tenantHref(basePath, "/dashboard")} aria-label={`${brand.name} home`}>
+          <Wordmark name={brand.name} logoUrl={brand.logoUrl} showRegistry={false} sealClassName="size-9" />
         </Link>
 
         <nav className="flex items-center gap-1">
