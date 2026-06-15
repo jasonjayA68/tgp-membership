@@ -1,4 +1,4 @@
-import type { AppRole, MemberStatus } from "@/lib/types";
+import type { MemberStatus, TenantRole } from "@/lib/types";
 
 export const SITE = {
   name: "Tau Gamma Phi",
@@ -50,8 +50,11 @@ export const STATUS_META: Record<
   },
 };
 
-export const ROLE_META: Record<AppRole, { label: string; rank: number }> = {
-  super_admin: { label: "Grand Administrator", rank: 3 },
+export const TENANT_ROLE_META: Record<
+  TenantRole,
+  { label: string; rank: number }
+> = {
+  owner: { label: "Owner", rank: 3 },
   admin: { label: "Administrator", rank: 2 },
   member: { label: "Member", rank: 1 },
 };
@@ -64,6 +67,8 @@ export const MEMBER_STATUSES: MemberStatus[] = [
   "rejected",
 ];
 
-export function isAdminRole(role: AppRole | null | undefined): boolean {
-  return role === "admin" || role === "super_admin";
+export function isTenantAdminRole(
+  role: TenantRole | null | undefined,
+): boolean {
+  return role === "admin" || role === "owner";
 }
