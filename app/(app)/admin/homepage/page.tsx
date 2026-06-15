@@ -4,10 +4,12 @@ import { HomepageEditor } from "@/components/admin/homepage-editor";
 import { requireTenantAdmin } from "@/lib/auth";
 import { DEFAULT_HOME, HomeContentSchema, type Block } from "@/lib/cms/blocks";
 import { createClient } from "@/lib/supabase/server";
+import { requireFeature } from "@/lib/tenant/features";
 
 export const metadata: Metadata = { title: "Homepage" };
 
 export default async function AdminHomepagePage() {
+  await requireFeature("homepage");
   const { tenant } = await requireTenantAdmin();
   const supabase = await createClient();
 

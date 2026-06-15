@@ -2,6 +2,7 @@ import { AdminNav } from "@/components/admin/admin-nav";
 import { requireTenantAdmin } from "@/lib/auth";
 import { TENANT_ROLE_META } from "@/lib/constants";
 import { getActiveTenantBasePath } from "@/lib/tenant/context";
+import { getActiveTenantFeatures } from "@/lib/tenant/features";
 
 export default async function AdminLayout({
   children,
@@ -11,6 +12,7 @@ export default async function AdminLayout({
   // Authoritative role gate for the entire /admin area.
   const { role } = await requireTenantAdmin();
   const basePath = await getActiveTenantBasePath();
+  const features = await getActiveTenantFeatures();
 
   return (
     <div className="space-y-6">
@@ -28,7 +30,7 @@ export default async function AdminLayout({
         </span>
       </header>
 
-      <AdminNav basePath={basePath} />
+      <AdminNav basePath={basePath} features={features} />
 
       {children}
     </div>
