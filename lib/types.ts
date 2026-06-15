@@ -39,6 +39,14 @@ export type TenantPage = {
   updated_at: string;
 };
 
+export type FeatureFlag = {
+  id: string;
+  tenant_id: string;
+  feature_key: string;
+  enabled: boolean;
+  updated_at: string;
+};
+
 /** Row shape returned by the public `get_tenant_homepage` RPC. */
 export type HomepageResult = {
   tenant_name: string;
@@ -49,6 +57,7 @@ export type HomepageResult = {
   tenant_secondary_color: string | null;
   content_json: { blocks: unknown[] };
   member_count: number;
+  homepage_enabled: boolean;
 };
 
 /** Per-tenant aggregate from `platform_tenant_stats`. */
@@ -167,6 +176,7 @@ export type MemberCard = {
   tenant_primary_color: string | null;
   tenant_secondary_color: string | null;
   public_fields: PublicField[];
+  verify_officer_enabled: boolean;
 };
 
 /**
@@ -232,6 +242,7 @@ export type Database = {
       };
       audit_logs: Generated<AuditLog>;
       tenant_pages: Generated<TenantPage>;
+      feature_flags: Generated<FeatureFlag>;
     };
     Views: { [_ in never]: never };
     Functions: {
