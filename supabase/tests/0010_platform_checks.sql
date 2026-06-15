@@ -21,17 +21,18 @@ select public.assign_tenant_owner(
   (select id from public.tenants where slug = 'probe-org-0010'), 'probe-owner@test.dev');
 
 do $$
-declare r text; p int;
+declare r text; a int;
 begin
   select role::text into r from public.tenant_users
    where user_id = '66666666-6666-6666-6666-666666666666'
      and tenant_id = (select id from public.tenants where slug='probe-org-0010');
   if r is distinct from 'owner' then raise exception 'FAIL: B is not owner (%)', r; end if;
-  select count(*) into p from public.profiles
-   where user_id = '66666666-6666-6666-6666-666666666666'
+  select count(*) into a from public.audit_logs
+   where action = 'owner_assigned'
+     and target_user = '66666666-6666-6666-6666-666666666666'
      and tenant_id = (select id from public.tenants where slug='probe-org-0010');
-  if p <> 1 then raise exception 'FAIL: owner profile missing (count=%)', p; end if;
-  raise notice 'OK: assign_tenant_owner made B an owner with a profile';
+  if a < 1 then raise exception 'FAIL: no owner_assigned audit row'; end if;
+  raise notice 'OK: assign_tenant_owner made B an owner and wrote an audit row';
 end $$;
 
 do $$
