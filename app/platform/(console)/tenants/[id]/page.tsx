@@ -1,16 +1,17 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Power, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Power, ShieldCheck, Archive, ArchiveRestore } from "lucide-react";
 
 import { AssignOwnerForm } from "@/components/platform/assign-owner-form";
 import { BrandingForm } from "@/components/platform/branding-form";
 import { DomainCard } from "@/components/platform/domain-card";
+import { EditOrgForm } from "@/components/platform/edit-org-form";
 import { TenantStatusBadge } from "@/components/platform/tenant-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { setTenantStatus } from "@/lib/actions/platform";
+import { setTenantStatus, archiveTenant, restoreTenant } from "@/lib/actions/platform";
 import { listTenantAdmins } from "@/lib/platform";
 import { createClient } from "@/lib/supabase/server";
 import type { Tenant } from "@/lib/types";
@@ -121,6 +122,7 @@ export default async function TenantDetailPage({
         <CardContent>
           <BrandingForm
             tenantId={tenant.id}
+            name={tenant.name}
             logoUrl={tenant.logo_url}
             primaryColor={tenant.primary_color}
             secondaryColor={tenant.secondary_color}
@@ -139,6 +141,57 @@ export default async function TenantDetailPage({
             token={tenant.domain_verify_token}
             verifiedAt={tenant.domain_verified_at}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Edit organization</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EditOrgForm
+            tenantId={tenant.id}
+            name={tenant.name}
+            slug={tenant.slug}
+            prefix={tenant.member_id_prefix}
+          />
+        </CardContent>
+      </Card>
+
+      <Card className="border-destructive/40">
+        <CardHeader>
+          <CardTitle className="text-base">Danger zone</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {tenant.status === "archived" ? (
+            <>
+              <p className="text-sm text-muted-foreground">
+                This organization is archived — its workspace is offline and it&apos;s hidden from the
+                list. Restore it to bring it back.
+              </p>
+              <form action={restoreTenant}>
+                <input type="hidden" name="tenantId" value={tenant.id} />
+                <SubmitButton size="sm" pendingText="…">
+                  <ArchiveRestore />
+                  Restore organization
+                </SubmitButton>
+              </form>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Archiving takes the organization offline and hides it from the list. No data is
+                deleted; you can restore it anytime.
+              </p>
+              <form action={archiveTenant}>
+                <input type="hidden" name="tenantId" value={tenant.id} />
+                <SubmitButton size="sm" variant="destructive" pendingText="…">
+                  <Archive />
+                  Archive organization
+                </SubmitButton>
+              </form>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

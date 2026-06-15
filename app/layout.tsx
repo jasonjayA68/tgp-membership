@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Cinzel, Inter, JetBrains_Mono } from "next/font/google";
 
-import { SITE } from "@/lib/constants";
+import { PLATFORM } from "@/lib/constants";
 import "./globals.css";
 
 const display = Cinzel({
@@ -25,17 +25,16 @@ const mono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: `${SITE.name} — ${SITE.registry}`,
-    template: `%s · ${SITE.name}`,
+    default: `${PLATFORM.name} — ${PLATFORM.tagline}`,
+    template: `%s · ${PLATFORM.name}`,
   },
-  description: SITE.description,
-  applicationName: `${SITE.name} Registry`,
-  authors: [{ name: SITE.legalName }],
-  keywords: ["Tau Gamma Phi", "Triskelion", "membership", "NFC", "verification"],
+  description: PLATFORM.description,
+  applicationName: PLATFORM.name,
+  keywords: ["membership", "NFC", "verification", "digital ID", "multi-tenant"],
   openGraph: {
-    title: `${SITE.name} — ${SITE.registry}`,
-    description: SITE.description,
-    siteName: `${SITE.name} Registry`,
+    title: `${PLATFORM.name} — ${PLATFORM.tagline}`,
+    description: PLATFORM.description,
+    siteName: PLATFORM.name,
     type: "website",
   },
 };

@@ -12,6 +12,17 @@ export const SITE = {
     "The official digital membership registry of Tau Gamma Phi. Verify member credentials instantly via NFC.",
 } as const;
 
+/**
+ * Neutral PLATFORM identity for the platform plane (root landing, /platform,
+ * the super-admin portal). Distinct from SITE, which is TGP's tenant identity.
+ */
+export const PLATFORM = {
+  name: "Organization Registry",
+  tagline: "Multi-tenant membership platform",
+  description:
+    "A multi-tenant platform for organizations to issue digital member IDs, manage chapters, and verify membership instantly via NFC.",
+} as const;
+
 type Tone = "gold" | "amber" | "muted" | "danger";
 
 export const STATUS_META: Record<

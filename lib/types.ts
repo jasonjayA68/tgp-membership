@@ -6,7 +6,7 @@
  * `Record<string, unknown>` schema constraint.
  */
 
-export type TenantStatus = "active" | "suspended" | "onboarding";
+export type TenantStatus = "active" | "suspended" | "onboarding" | "archived";
 export type TenantRole = "owner" | "admin" | "member";
 
 export type MemberStatus =
@@ -260,6 +260,7 @@ export type Database = {
       };
       join_tenant_by_slug: { Args: { p_slug: string }; Returns: undefined };
       is_platform_admin: { Args: Record<string, never>; Returns: boolean };
+      claim_platform_admin: { Args: Record<string, never>; Returns: boolean };
       is_tenant_member: { Args: { tid: string }; Returns: boolean };
       is_tenant_admin: { Args: { tid: string }; Returns: boolean };
       is_tenant_owner: { Args: { tid: string }; Returns: boolean };

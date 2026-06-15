@@ -120,7 +120,6 @@ export async function updateTenantBranding(
   const { error } = await supabase
     .from("tenants")
     .update({
-      logo_url: clean("logo_url"),
       primary_color: clean("primary_color"),
       secondary_color: clean("secondary_color"),
     })
@@ -230,4 +229,161 @@ export async function removeCustomDomain(
   if (error) return { error: error.message };
   revalidatePath(`/platform/tenants/${tenantId}`);
   return { notice: "Custom domain removed." };
+}
+
+/** Edit an org's core fields (name / slug / member-ID prefix). */
+export async function updateTenant(
+  _prev: PlatformState,
+  formData: FormData,
+): Promise<PlatformState> {
+  const { supabase, user } = await getPlatformContext();
+  const tenantId = String(formData.get("tenantId") ?? "");
+  if (!tenantId) return { error: "Missing tenant." };
+
+  const name = String(formData.get("name") ?? "").trim();
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  const prefix = String(formData.get("prefix") ?? "").trim().toUpperCase();
+  if (name.length < 2) return { error: "Enter an organization name." };
+  if (!/^[a-z0-9-]{2,40}$/.test(slug)) {
+    return { error: "Slug must be 2–40 lowercase letters, numbers, or hyphens." };
+  }
+  if (!/^[A-Z0-9]{2,8}$/.test(prefix)) {
+    return { error: "Prefix must be 2–8 uppercase letters or numbers." };
+  }
+
+  const { error } = await supabase
+    .from("tenants")
+    .update({ name, slug, member_id_prefix: prefix })
+    .eq("id", tenantId);
+  if (error) {
+    return {
+      error:
+        error.code === "23505" || error.message.includes("duplicate")
+          ? "That slug is already taken."
+          : error.message,
+    };
+  }
+  await supabase.from("audit_logs").insert({
+    tenant_id: tenantId,
+    action: "tenant_updated",
+    performed_by: user.id,
+    metadata: { name, slug, prefix },
+  });
+  revalidatePath(`/platform/tenants/${tenantId}`);
+  revalidatePath("/platform");
+  return { notice: "Organization updated." };
+}
+
+/** Soft-delete: archive an org (data preserved, workspace blocked). */
+export async function archiveTenant(formData: FormData): Promise<void> {
+  const { supabase, user } = await getPlatformContext();
+  const tenantId = String(formData.get("tenantId") ?? "");
+  if (!tenantId) return;
+  await supabase.from("tenants").update({ status: "archived" }).eq("id", tenantId);
+  await supabase.from("audit_logs").insert({
+    tenant_id: tenantId,
+    action: "tenant_archived",
+    performed_by: user.id,
+    metadata: {},
+  });
+  revalidatePath(`/platform/tenants/${tenantId}`);
+  revalidatePath("/platform");
+}
+
+/** Restore an archived org to active. */
+export async function restoreTenant(formData: FormData): Promise<void> {
+  const { supabase, user } = await getPlatformContext();
+  const tenantId = String(formData.get("tenantId") ?? "");
+  if (!tenantId) return;
+  await supabase.from("tenants").update({ status: "active" }).eq("id", tenantId);
+  await supabase.from("audit_logs").insert({
+    tenant_id: tenantId,
+    action: "tenant_restored",
+    performed_by: user.id,
+    metadata: {},
+  });
+  revalidatePath(`/platform/tenants/${tenantId}`);
+  revalidatePath("/platform");
+}
+
+// SVG is intentionally excluded: the branding bucket is public-read, and an SVG
+// with embedded <script> served from its public URL is a stored-XSS vector.
+const LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const LOGO_EXT: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+};
+
+/** Upload a tenant logo to the `branding` bucket and store its public URL. */
+export async function uploadTenantLogo(
+  _prev: PlatformState,
+  formData: FormData,
+): Promise<PlatformState> {
+  const { supabase, user } = await getPlatformContext();
+  const tenantId = String(formData.get("tenantId") ?? "");
+  if (!tenantId) return { error: "Missing tenant." };
+
+  const file = formData.get("logo");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "Choose a logo image to upload." };
+  }
+  if (!LOGO_TYPES.has(file.type)) {
+    return { error: "Logo must be a PNG, JPG, or WebP." };
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    return { error: "Logo must be 2 MB or smaller." };
+  }
+
+  const filename = `logo-${Date.now()}.${LOGO_EXT[file.type]}`;
+  const path = `${tenantId}/${filename}`;
+  const { error: upErr } = await supabase.storage
+    .from("branding")
+    .upload(path, file, { upsert: true, contentType: file.type });
+  if (upErr) return { error: upErr.message };
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from("branding").getPublicUrl(path);
+  const { error: updErr } = await supabase
+    .from("tenants")
+    .update({ logo_url: publicUrl })
+    .eq("id", tenantId);
+  if (updErr) return { error: updErr.message };
+
+  // Prune superseded logos for this tenant.
+  const { data: existing } = await supabase.storage.from("branding").list(tenantId);
+  const stale = (existing ?? [])
+    .filter((f) => f.name !== filename)
+    .map((f) => `${tenantId}/${f.name}`);
+  if (stale.length) await supabase.storage.from("branding").remove(stale);
+
+  await supabase.from("audit_logs").insert({
+    tenant_id: tenantId,
+    action: "branding_updated",
+    performed_by: user.id,
+    metadata: { logo: true },
+  });
+  revalidatePath(`/platform/tenants/${tenantId}`);
+  return { notice: "Logo updated." };
+}
+
+/** Remove a tenant's logo (clears logo_url + deletes the stored files). */
+export async function removeTenantLogo(formData: FormData): Promise<void> {
+  const { supabase, user } = await getPlatformContext();
+  const tenantId = String(formData.get("tenantId") ?? "");
+  if (!tenantId) return;
+
+  const { data: existing } = await supabase.storage.from("branding").list(tenantId);
+  const all = (existing ?? []).map((f) => `${tenantId}/${f.name}`);
+  if (all.length) await supabase.storage.from("branding").remove(all);
+
+  await supabase.from("tenants").update({ logo_url: null }).eq("id", tenantId);
+  await supabase.from("audit_logs").insert({
+    tenant_id: tenantId,
+    action: "branding_updated",
+    performed_by: user.id,
+    metadata: { logo: false },
+  });
+  revalidatePath(`/platform/tenants/${tenantId}`);
 }

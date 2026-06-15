@@ -145,7 +145,7 @@ export async function signIn(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
   });
@@ -160,7 +160,19 @@ export async function signIn(
     return { error: "Invalid email or password. Please try again." };
   }
 
-  redirect(safeNext(formData.get("next")));
+  const next = safeNext(formData.get("next"));
+  // Platform admins with no explicit destination land on the console. This runs
+  // on the just-minted session, so the platform_admins read sees a fresh token.
+  if (next === "/" && data.user) {
+    const { data: isAdmin } = await supabase
+      .from("platform_admins")
+      .select("user_id")
+      .eq("user_id", data.user.id)
+      .maybeSingle();
+    if (isAdmin) redirect("/platform");
+  }
+
+  redirect(next);
 }
 
 export async function signOut(): Promise<void> {

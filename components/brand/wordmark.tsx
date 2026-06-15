@@ -1,5 +1,4 @@
 import { Brandmark } from "@/components/brand/brandmark";
-import { SITE } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 export function Wordmark({
@@ -24,7 +23,7 @@ export function Wordmark({
         </div>
         {showRegistry && (
           <div className="text-[10px] tracking-[0.3em] text-gold/80 uppercase">
-            {SITE.registry}
+            Membership Registry
           </div>
         )}
       </div>

@@ -162,6 +162,8 @@ export async function updateSession(request: NextRequest) {
     if (!tenant) return rewrite("/workspace-not-found", request, response);
     if (tenant.status === "suspended")
       return rewrite("/workspace-suspended", request, response);
+    if (tenant.status === "archived")
+      return rewrite("/workspace-not-found", request, response);
 
     // Logged-out → carry tenant + return path to the global login.
     if (!user) {
