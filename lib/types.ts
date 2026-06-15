@@ -113,26 +113,31 @@ export type AuditLog = {
   created_at: string;
 };
 
-/** Whitelisted shape returned by the public `get_member_card` RPC (unchanged). */
+/** One public, schema-defined member field returned by `get_member_card`. */
+export type PublicField = {
+  key: string;
+  label: string;
+  type: string; // 'text' | 'date' | 'phone' | 'number' (drives rendering)
+  value: string;
+};
+
+/** Whitelisted shape returned by the public `get_member_card` RPC (tenant-aware). */
 export type MemberCard = {
   full_name: string;
   member_id: string | null;
-  alexis_name: string | null;
-  batch_name: string | null;
-  date_survived: string | null;
-  gt_name: string | null;
-  gt_number: string | null;
-  mww_name: string | null;
-  mww_number: string | null;
-  chapter: string | null;
-  district: string | null;
-  region: string | null;
   batch_year: number | null;
   status: MemberStatus;
   photo_url: string | null;
+  chapter: string | null;
+  district: string | null;
+  region: string | null;
   card_active: boolean;
   verify_contact_name: string | null;
   verify_contact_number: string | null;
+  tenant_name: string;
+  tenant_slug: string;
+  tenant_logo_url: string | null;
+  public_fields: PublicField[];
 };
 
 /**
@@ -201,6 +206,7 @@ export type Database = {
     Views: { [_ in never]: never };
     Functions: {
       get_member_card: { Args: { card_slug: string }; Returns: MemberCard[] };
+      record_card_scan: { Args: { card_slug: string }; Returns: undefined };
       resolve_tenant_by_slug: {
         Args: { p_slug: string };
         Returns: ResolvedTenant[];

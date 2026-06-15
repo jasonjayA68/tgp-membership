@@ -82,6 +82,17 @@ export async function updateSession(request: NextRequest) {
     if (!slug) return redirect("/", request, response);
     const rest = "/" + segs.slice(2).join("/");
 
+    // Public per-tenant verification (/t/[slug]/id/...) is anonymous — strip any
+    // spoofed tenant headers and route straight to the verify page (no auth gate).
+    if (segs[2] === "id") {
+      const clean = new Headers(request.headers);
+      clean.delete("x-tenant-id");
+      clean.delete("x-tenant-slug");
+      clean.delete("x-tenant-basepath");
+      const passthrough = NextResponse.next({ request: { headers: clean } });
+      return carryCookies(response, passthrough);
+    }
+
     const tenant = await resolveTenantForMiddleware(slug);
     if (!tenant) return rewrite("/workspace-not-found", request, response);
     if (tenant.status === "suspended")

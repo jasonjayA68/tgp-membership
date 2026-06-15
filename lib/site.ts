@@ -27,6 +27,10 @@ export async function getBaseUrl(): Promise<string> {
   return "http://localhost:3000";
 }
 
-export function verificationUrl(baseUrl: string, slug: string): string {
-  return `${baseUrl.replace(/\/$/, "")}/id/${slug}`;
+export function verificationUrl(
+  baseUrl: string,
+  tenantSlug: string,
+  cardSlug: string,
+): string {
+  return `${baseUrl.replace(/\/$/, "")}/t/${tenantSlug}/id/${cardSlug}`;
 }

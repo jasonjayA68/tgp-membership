@@ -115,7 +115,7 @@ export default async function MemberDetailPage({
     "id" | "name" | "district" | "region"
   >[];
   const baseUrl = await getBaseUrl();
-  const verifyUrl = card ? verificationUrl(baseUrl, card.slug) : null;
+  const verifyUrl = card ? verificationUrl(baseUrl, auth.tenant.slug, card.slug) : null;
 
   const cardData: IdCardData = {
     fullName: profile.full_name,
@@ -184,7 +184,7 @@ export default async function MemberDetailPage({
                     <CopyButton value={verifyUrl!} className="flex-1" />
                     <Button asChild variant="secondary" size="sm">
                       <Link
-                        href={`/id/${card.slug}`}
+                        href={verifyUrl!}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
