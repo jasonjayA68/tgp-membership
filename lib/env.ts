@@ -22,4 +22,7 @@ export const env = {
     "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   ),
+  /** Canonical production host (e.g. "tgp.example.com"); when set it is treated
+   *  as path-mode, never a tenant custom domain. Optional — defaults to null. */
+  APP_HOST: process.env.NEXT_PUBLIC_APP_HOST ?? null,
 };

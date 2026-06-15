@@ -21,6 +21,8 @@ export type Tenant = {
   name: string;
   slug: string;
   custom_domain: string | null;
+  domain_verify_token: string | null;
+  domain_verified_at: string | null;
   status: TenantStatus;
   plan_type: string;
   member_id_prefix: string;
@@ -250,6 +252,10 @@ export type Database = {
       record_card_scan: { Args: { card_slug: string }; Returns: undefined };
       resolve_tenant_by_slug: {
         Args: { p_slug: string };
+        Returns: ResolvedTenant[];
+      };
+      resolve_tenant_by_host: {
+        Args: { p_host: string };
         Returns: ResolvedTenant[];
       };
       join_tenant_by_slug: { Args: { p_slug: string }; Returns: undefined };
