@@ -2,7 +2,11 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { env } from "@/lib/env";
-import { resolveTenantForMiddleware } from "@/lib/tenant/resolve";
+import { isCanonicalHost, normalizeHost } from "@/lib/tenant/host";
+import {
+  resolveTenantByHost,
+  resolveTenantForMiddleware,
+} from "@/lib/tenant/resolve";
 
 /** Bare workspace paths that are only valid under /t/[slug] in subpath mode. */
 const WORKSPACE_PREFIXES = ["/dashboard", "/admin", "/profile"];
@@ -74,6 +78,66 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
+
+  // ---- Custom-domain host mode ----------------------------------------------
+  // A request on a non-canonical Host is a tenant's verified custom domain; its
+  // whole path is tenant-relative (a transparent alias for /t/[slug]).
+  const host = normalizeHost(request.headers.get("host"));
+  if (host && !isCanonicalHost(host, env.APP_HOST)) {
+    const tenant = await resolveTenantByHost(host);
+    if (!tenant) return rewrite("/workspace-not-found", request, response);
+
+    // A custom domain is a transparent alias: a tenant-aware redirect to an
+    // absolute `/t/<this-slug>/<rest>` (e.g. from register/join) is equivalent
+    // to `/<rest>` here, so normalize it back to a host-relative path.
+    const segs = path.split("/").filter(Boolean);
+    const relPath =
+      segs[0] === "t" && segs[1] === tenant.slug
+        ? "/" + segs.slice(2).join("/")
+        : path;
+    const seg0 = relPath.split("/").filter(Boolean)[0];
+
+    // Strip any client-supplied (spoofed) tenant headers before trusting/using.
+    const clean = new Headers(request.headers);
+    clean.delete("x-tenant-id");
+    clean.delete("x-tenant-slug");
+    clean.delete("x-tenant-basepath");
+
+    // Global auth routes render same-origin on the custom domain (no tenant gate,
+    // no rewrite into the /t tree) — otherwise the logged-out redirect below
+    // would target /login and loop forever.
+    if (seg0 === "login" || seg0 === "register" || seg0 === "auth") {
+      return rewrite(relPath, request, response, clean);
+    }
+
+    // Public per-tenant verification + homepage are anonymous. Their real routes
+    // live under app/t/[tenant]/..., so rewrite to the /t/<slug> path.
+    if (seg0 === "id" || seg0 === "home") {
+      return rewrite(`/t/${tenant.slug}${relPath}`, request, response, clean);
+    }
+
+    // Logged-out → global login carrying the tenant slug + return path.
+    if (!user) {
+      return redirect(
+        `/login?tenant=${encodeURIComponent(tenant.slug)}&next=${encodeURIComponent(relPath)}`,
+        request,
+        response,
+      );
+    }
+
+    // Authed workspace: inject trusted headers (empty basepath = root-relative
+    // links) and rewrite to the flat (app) route; root → dashboard.
+    clean.set("x-tenant-id", tenant.id);
+    clean.set("x-tenant-slug", tenant.slug);
+    clean.set("x-tenant-basepath", "");
+
+    return rewrite(
+      relPath === "/" ? "/dashboard" : relPath,
+      request,
+      response,
+      clean,
+    );
+  }
 
   // ---- Tenant-scoped routes: /t/[slug]/<rest> -------------------------------
   if (path === "/t" || path.startsWith("/t/")) {
