@@ -1,12 +1,13 @@
 /**
- * Database types for the Tau Gamma Phi membership registry.
- * Hand-authored to mirror supabase/migrations/0001_init.sql.
+ * Database types for the SaaS OS (multi-tenant). Hand-authored to mirror
+ * supabase/migrations/0007_tenant_foundation.sql.
  *
- * Note: the row shapes are `type` aliases (not `interface`) so they satisfy
- * supabase-js's `Record<string, unknown>` schema constraint.
+ * Row shapes are `type` aliases (not `interface`) to satisfy supabase-js's
+ * `Record<string, unknown>` schema constraint.
  */
 
-export type AppRole = "super_admin" | "admin" | "member";
+export type TenantStatus = "active" | "suspended" | "onboarding";
+export type TenantRole = "owner" | "admin" | "member";
 
 export type MemberStatus =
   | "pending"
@@ -15,23 +16,64 @@ export type MemberStatus =
   | "suspended"
   | "rejected";
 
+export type Tenant = {
+  id: string;
+  name: string;
+  slug: string;
+  custom_domain: string | null;
+  status: TenantStatus;
+  plan_type: string;
+  member_id_prefix: string;
+  member_seq: number;
+  logo_url: string | null;
+  primary_color: string | null;
+  secondary_color: string | null;
+  created_at: string;
+};
+
+export type PlatformAdmin = { user_id: string; created_at: string };
+
+export type TenantUser = {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  role: TenantRole;
+  created_at: string;
+};
+
+export type TenantFieldSchema = {
+  id: string;
+  tenant_id: string;
+  key: string;
+  label: string;
+  type: string;
+  is_public: boolean;
+  sort_order: number;
+  created_at: string;
+};
+
 export type Chapter = {
   id: string;
+  tenant_id: string;
   name: string;
   district: string | null;
   region: string | null; // council
-  verify_officer_id: string | null; // admin profile who verifies this chapter
+  verify_officer_id: string | null;
   created_at: string;
 };
 
 export type DistrictOfficer = {
+  id: string;
+  tenant_id: string;
   district: string;
   officer_id: string | null;
   created_at: string;
 };
 
+/** DB row. Fraternal/custom data lives in `custom_fields`. */
 export type Profile = {
   id: string;
+  tenant_id: string;
   user_id: string;
   full_name: string;
   member_id: string | null;
@@ -39,24 +81,14 @@ export type Profile = {
   batch_year: number | null;
   status: MemberStatus;
   photo_url: string | null;
-  role: AppRole;
-  // Fraternal information
-  alexis_name: string | null;
-  batch_name: string | null;
-  date_survived: string | null;
-  // Lineage / other information
-  gt_name: string | null;
-  gt_number: string | null;
-  mww_name: string | null;
-  mww_number: string | null;
-  // Contact
-  contact_number: string | null;
+  custom_fields: Record<string, string | null>;
   created_at: string;
   updated_at: string;
 };
 
 export type NfcCard = {
   id: string;
+  tenant_id: string;
   profile_id: string;
   slug: string;
   active: boolean;
@@ -67,6 +99,7 @@ export type NfcCard = {
 
 export type AuditLog = {
   id: string;
+  tenant_id: string;
   action: string;
   performed_by: string | null;
   target_user: string | null;
@@ -74,7 +107,7 @@ export type AuditLog = {
   created_at: string;
 };
 
-/** Whitelisted shape returned by the public `get_member_card` RPC. */
+/** Whitelisted shape returned by the public `get_member_card` RPC (unchanged). */
 export type MemberCard = {
   full_name: string;
   member_id: string | null;
@@ -96,9 +129,21 @@ export type MemberCard = {
   verify_contact_number: string | null;
 };
 
-/** Profile joined with its chapter — used throughout the authed app. */
+/**
+ * View type used throughout the authed app: the profile row joined with its
+ * chapter AND with TGP's fraternal `custom_fields` flattened to named props
+ * (compat shim — see lib/profile.ts). Replaced by schema-driven rendering later.
+ */
 export type ProfileWithChapter = Profile & {
   chapter: Pick<Chapter, "id" | "name" | "district" | "region"> | null;
+  alexis_name: string | null;
+  batch_name: string | null;
+  date_survived: string | null;
+  gt_name: string | null;
+  gt_number: string | null;
+  mww_name: string | null;
+  mww_number: string | null;
+  contact_number: string | null;
 };
 
 type Generated<T> = {
@@ -111,6 +156,10 @@ type Generated<T> = {
 export type Database = {
   public: {
     Tables: {
+      tenants: Generated<Tenant>;
+      platform_admins: Generated<PlatformAdmin>;
+      tenant_users: Generated<TenantUser>;
+      tenant_field_schema: Generated<TenantFieldSchema>;
       chapters: Generated<Chapter>;
       district_officers: Generated<DistrictOfficer>;
       profiles: {
@@ -145,15 +194,16 @@ export type Database = {
     };
     Views: { [_ in never]: never };
     Functions: {
-      get_member_card: {
-        Args: { card_slug: string };
-        Returns: MemberCard[];
-      };
-      is_admin: { Args: Record<string, never>; Returns: boolean };
-      is_super_admin: { Args: Record<string, never>; Returns: boolean };
+      get_member_card: { Args: { card_slug: string }; Returns: MemberCard[] };
+      is_platform_admin: { Args: Record<string, never>; Returns: boolean };
+      is_tenant_member: { Args: { tid: string }; Returns: boolean };
+      is_tenant_admin: { Args: { tid: string }; Returns: boolean };
+      is_tenant_owner: { Args: { tid: string }; Returns: boolean };
+      next_member_id: { Args: { tid: string }; Returns: string };
     };
     Enums: {
-      app_role: AppRole;
+      tenant_status: TenantStatus;
+      tenant_role: TenantRole;
       member_status: MemberStatus;
     };
     CompositeTypes: { [_ in never]: never };

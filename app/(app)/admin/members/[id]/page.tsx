@@ -29,18 +29,21 @@ import {
   setMemberRole,
   setMemberStatus,
 } from "@/lib/actions/admin";
-import { getAuth } from "@/lib/auth";
-import { MEMBER_STATUSES, ROLE_META, STATUS_META } from "@/lib/constants";
+import { requireTenantAdmin } from "@/lib/auth";
+import { MEMBER_STATUSES, STATUS_META, TENANT_ROLE_META } from "@/lib/constants";
+import { toProfileView, type ProfileRow } from "@/lib/profile";
+import { tdb } from "@/lib/supabase/db";
+import type { TenantRole } from "@/lib/types";
 import { getBaseUrl, verificationUrl } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
-import type { Chapter, NfcCard, ProfileWithChapter } from "@/lib/types";
+import type { Chapter, NfcCard } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Manage Member" };
 
 const ROLE_OPTIONS = [
-  { value: "member", label: ROLE_META.member.label },
-  { value: "admin", label: ROLE_META.admin.label },
-  { value: "super_admin", label: ROLE_META.super_admin.label },
+  { value: "member", label: TENANT_ROLE_META.member.label },
+  { value: "admin", label: TENANT_ROLE_META.admin.label },
+  { value: "owner", label: TENANT_ROLE_META.owner.label },
 ];
 
 function FieldRow({
@@ -69,27 +72,30 @@ export default async function MemberDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const auth = await getAuth();
-  const isSuperAdmin = auth?.profile?.role === "super_admin";
+  const auth = await requireTenantAdmin();
+  const isOwner = auth.role === "owner";
+  const db = tdb(supabase, auth.tenant.id);
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("*, chapter:chapters!profiles_chapter_id_fkey(*)")
+  const { data: profileRow, error: profileError } = await db
+    .select("profiles", "*, chapter:chapters!profiles_chapter_id_fkey(*)")
     .eq("id", id)
-    .maybeSingle<ProfileWithChapter>();
+    .maybeSingle<ProfileRow>();
   if (profileError) throw profileError;
-  if (!profile) notFound();
+  if (!profileRow) notFound();
+  const profile = toProfileView(profileRow);
+
+  // The target member's tenant role (for the role <select> default).
+  const { data: targetMembership } = await db
+    .select("tenant_users", "role")
+    .eq("user_id", profile.user_id)
+    .maybeSingle<{ role: TenantRole }>();
+  const targetRole = targetMembership?.role ?? "member";
 
   const [chaptersResult, cardResult, logsResult] = await Promise.all([
-    supabase.from("chapters").select("*").order("name"),
-    supabase
-      .from("nfc_cards")
-      .select("*")
-      .eq("profile_id", profile.id)
-      .maybeSingle<NfcCard>(),
-    supabase
-      .from("audit_logs")
-      .select("*")
+    db.select("chapters").order("name"),
+    db.select("nfc_cards").eq("profile_id", profile.id).maybeSingle<NfcCard>(),
+    db
+      .select("audit_logs")
       .eq("target_user", profile.user_id)
       .order("created_at", { ascending: false })
       .limit(8),
@@ -286,23 +292,23 @@ export default async function MemberDetailPage({
               <FieldRow
                 label="Role"
                 hint={
-                  isSuperAdmin
+                  isOwner
                     ? "Grant administrative privileges."
                     : "Only a Grand Administrator can change roles."
                 }
               >
-                {isSuperAdmin ? (
+                {isOwner ? (
                   <ActionSelect
                     action={setMemberRole}
                     name="role"
-                    defaultValue={profile.role}
+                    defaultValue={targetRole}
                     hidden={{ profileId: profile.id }}
                     ariaLabel="Member role"
                     options={ROLE_OPTIONS}
                   />
                 ) : (
                   <div className="flex h-10 items-center rounded-md border border-border bg-muted/40 px-3 text-sm text-muted-foreground">
-                    {ROLE_META[profile.role].label}
+                    {TENANT_ROLE_META[targetRole].label}
                   </div>
                 )}
               </FieldRow>

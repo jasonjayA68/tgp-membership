@@ -9,7 +9,7 @@ import { TgpSeal } from "@/components/brand/seal";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { getAuth } from "@/lib/auth";
-import { ROLE_META, STATUS_META } from "@/lib/constants";
+import { STATUS_META, TENANT_ROLE_META } from "@/lib/constants";
 
 export const metadata: Metadata = { title: "Edit Profile" };
 
@@ -17,7 +17,7 @@ export default async function ProfilePage() {
   const auth = await getAuth();
   if (!auth) redirect("/login");
 
-  const { profile, user } = auth;
+  const { profile, user, role } = auth;
   const name = profile?.full_name || user.email || "Member";
   const status = profile?.status ?? "pending";
   const meta = STATUS_META[status];
@@ -41,7 +41,7 @@ export default async function ProfilePage() {
     { label: "Chapter", value: profile?.chapter?.name ?? "—" },
     { label: "District", value: profile?.chapter?.district ?? "—" },
     { label: "Council", value: profile?.chapter?.region ?? "—" },
-    { label: "Role", value: ROLE_META[profile?.role ?? "member"].label },
+    { label: "Role", value: TENANT_ROLE_META[role ?? "member"].label },
     { label: "Email", value: user.email ?? "—" },
   ];
 

@@ -4,31 +4,37 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { MEMBER_STATUSES } from "@/lib/constants";
-import type { AppRole, MemberStatus } from "@/lib/types";
+import { getActiveTenant } from "@/lib/tenant/context";
+import type { MemberStatus, TenantRole } from "@/lib/types";
 
 /**
- * Re-verifies admin authority inside every action. Page/layout guards do NOT
- * protect Server Actions, so this is the real enforcement boundary (backed in
- * turn by RLS, which independently rejects non-admin writes).
+ * Re-verifies tenant-admin authority inside every action against the ACTIVE
+ * tenant's membership. Page guards do NOT protect Server Actions, so this is
+ * the real enforcement boundary (backed by RLS, which independently rejects
+ * non-admin writes).
  */
-async function getAdminClient() {
+async function getAdminContext() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
 
+  const tenant = await getActiveTenant();
+
   const { data, error } = await supabase
-    .from("profiles")
+    .from("tenant_users")
     .select("role")
+    .eq("tenant_id", tenant.id)
     .eq("user_id", user.id)
     .single();
   if (error) throw new Error("Unauthorized");
 
-  if (!data || (data.role !== "admin" && data.role !== "super_admin")) {
+  const role = data?.role as TenantRole | undefined;
+  if (!role || (role !== "admin" && role !== "owner")) {
     throw new Error("Forbidden");
   }
-  return { supabase, user, role: data.role as AppRole };
+  return { supabase, user, tenant, role };
 }
 
 function revalidateMember(profileId?: string) {
@@ -52,7 +58,7 @@ function required(formData: FormData, key: string): string {
 
 /** Approve / reject / change a member's standing. */
 export async function setMemberStatus(formData: FormData): Promise<void> {
-  const { supabase } = await getAdminClient();
+  const { supabase, tenant } = await getAdminContext();
   const profileId = required(formData, "profileId");
   const status = required(formData, "status") as MemberStatus;
   if (!MEMBER_STATUSES.includes(status)) throw new Error("Invalid status");
@@ -60,7 +66,8 @@ export async function setMemberStatus(formData: FormData): Promise<void> {
   const { error } = await supabase
     .from("profiles")
     .update({ status })
-    .eq("id", profileId);
+    .eq("id", profileId)
+    .eq("tenant_id", tenant.id);
   if (error) throw new Error(error.message);
 
   revalidateMember(profileId);
@@ -69,7 +76,7 @@ export async function setMemberStatus(formData: FormData): Promise<void> {
 
 /** Assign (or clear) a member's chapter. */
 export async function assignChapter(formData: FormData): Promise<void> {
-  const { supabase } = await getAdminClient();
+  const { supabase, tenant } = await getAdminContext();
   const profileId = required(formData, "profileId");
   const raw = formData.get("chapterId");
   const chapterId = typeof raw === "string" && raw.length > 0 ? raw : null;
@@ -77,28 +84,39 @@ export async function assignChapter(formData: FormData): Promise<void> {
   const { error } = await supabase
     .from("profiles")
     .update({ chapter_id: chapterId })
-    .eq("id", profileId);
+    .eq("id", profileId)
+    .eq("tenant_id", tenant.id);
   if (error) throw new Error(error.message);
 
   revalidateMember(profileId);
 }
 
-/** Change a member's role — Grand Administrator (super_admin) only. */
+/** Change a member's tenant role — owners only. */
 export async function setMemberRole(formData: FormData): Promise<void> {
-  const { supabase, role } = await getAdminClient();
-  if (role !== "super_admin") {
-    throw new Error("Only a Grand Administrator can change roles.");
+  const { supabase, tenant, role } = await getAdminContext();
+  if (role !== "owner") {
+    throw new Error("Only an Owner can change roles.");
   }
   const profileId = required(formData, "profileId");
-  const newRole = required(formData, "role") as AppRole;
-  if (!["member", "admin", "super_admin"].includes(newRole)) {
+  const newRole = required(formData, "role") as TenantRole;
+  if (!["member", "admin", "owner"].includes(newRole)) {
     throw new Error("Invalid role");
   }
 
-  const { error } = await supabase
+  // Resolve the target user from their profile (scoped to this tenant).
+  const { data: target, error: targetError } = await supabase
     .from("profiles")
+    .select("user_id")
+    .eq("id", profileId)
+    .eq("tenant_id", tenant.id)
+    .single();
+  if (targetError || !target) throw new Error("Member not found");
+
+  const { error } = await supabase
+    .from("tenant_users")
     .update({ role: newRole })
-    .eq("id", profileId);
+    .eq("tenant_id", tenant.id)
+    .eq("user_id", target.user_id);
   if (error) throw new Error(error.message);
 
   revalidateMember(profileId);
@@ -106,13 +124,14 @@ export async function setMemberRole(formData: FormData): Promise<void> {
 
 /** Generate (or regenerate) the member's NFC slug. */
 export async function regenerateSlug(formData: FormData): Promise<void> {
-  const { supabase } = await getAdminClient();
+  const { supabase, tenant } = await getAdminContext();
   const profileId = required(formData, "profileId");
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("member_id")
     .eq("id", profileId)
+    .eq("tenant_id", tenant.id)
     .single();
   if (profileError) throw new Error(profileError.message);
 
@@ -127,6 +146,7 @@ export async function regenerateSlug(formData: FormData): Promise<void> {
     .from("nfc_cards")
     .select("id")
     .eq("profile_id", profileId)
+    .eq("tenant_id", tenant.id)
     .maybeSingle();
 
   const { error } = card
@@ -134,7 +154,10 @@ export async function regenerateSlug(formData: FormData): Promise<void> {
         .from("nfc_cards")
         .update({ slug, active: true })
         .eq("id", card.id)
-    : await supabase.from("nfc_cards").insert({ profile_id: profileId, slug });
+        .eq("tenant_id", tenant.id)
+    : await supabase
+        .from("nfc_cards")
+        .insert({ profile_id: profileId, slug, tenant_id: tenant.id });
 
   if (error) throw new Error(error.message);
   revalidateMember(profileId);
@@ -142,14 +165,15 @@ export async function regenerateSlug(formData: FormData): Promise<void> {
 
 /** Activate / deactivate an NFC card. */
 export async function setCardActive(formData: FormData): Promise<void> {
-  const { supabase } = await getAdminClient();
+  const { supabase, tenant } = await getAdminContext();
   const cardId = required(formData, "cardId");
   const active = formData.get("active") === "true";
 
   const { error } = await supabase
     .from("nfc_cards")
     .update({ active })
-    .eq("id", cardId);
+    .eq("id", cardId)
+    .eq("tenant_id", tenant.id);
   if (error) throw new Error(error.message);
 
   const profileId = formData.get("profileId");
@@ -163,7 +187,7 @@ export async function createChapter(
   _prev: ChapterState,
   formData: FormData,
 ): Promise<ChapterState> {
-  const { supabase } = await getAdminClient();
+  const { supabase, tenant } = await getAdminContext();
   const name = String(formData.get("name") ?? "").trim();
   const district = String(formData.get("district") ?? "").trim();
   const region = String(formData.get("region") ?? "").trim();
@@ -172,7 +196,7 @@ export async function createChapter(
 
   const { error } = await supabase
     .from("chapters")
-    .insert({ name, district: district || null, region: region || null });
+    .insert({ name, district: district || null, region: region || null, tenant_id: tenant.id });
   if (error) {
     return {
       error: error.message.includes("duplicate")
@@ -191,7 +215,7 @@ export async function updateChapter(
   _prev: ChapterState,
   formData: FormData,
 ): Promise<ChapterState> {
-  const { supabase } = await getAdminClient();
+  const { supabase, tenant } = await getAdminContext();
   const id = required(formData, "chapterId");
   const name = String(formData.get("name") ?? "").trim();
   const district = String(formData.get("district") ?? "").trim();
@@ -202,7 +226,8 @@ export async function updateChapter(
   const { error } = await supabase
     .from("chapters")
     .update({ name, district: district || null, region: region || null })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("tenant_id", tenant.id);
   if (error) {
     return {
       error: error.message.includes("duplicate")
@@ -218,10 +243,14 @@ export async function updateChapter(
 
 /** Delete a chapter. Members assigned to it become Unassigned (FK ON DELETE SET NULL). */
 export async function deleteChapter(formData: FormData): Promise<void> {
-  const { supabase } = await getAdminClient();
+  const { supabase, tenant } = await getAdminContext();
   const id = required(formData, "chapterId");
 
-  const { error } = await supabase.from("chapters").delete().eq("id", id);
+  const { error } = await supabase
+    .from("chapters")
+    .delete()
+    .eq("id", id)
+    .eq("tenant_id", tenant.id);
   if (error) throw new Error(error.message);
 
   revalidatePath("/admin/chapters");
@@ -231,7 +260,7 @@ export async function deleteChapter(formData: FormData): Promise<void> {
 
 /** Assign (or clear) the verifying officer for a chapter. */
 export async function setChapterOfficer(formData: FormData): Promise<void> {
-  const { supabase } = await getAdminClient();
+  const { supabase, tenant } = await getAdminContext();
   const chapterId = required(formData, "chapterId");
   const raw = formData.get("officerId");
   const officerId = typeof raw === "string" && raw.length > 0 ? raw : null;
@@ -239,7 +268,8 @@ export async function setChapterOfficer(formData: FormData): Promise<void> {
   const { error } = await supabase
     .from("chapters")
     .update({ verify_officer_id: officerId })
-    .eq("id", chapterId);
+    .eq("id", chapterId)
+    .eq("tenant_id", tenant.id);
   if (error) throw new Error(error.message);
 
   revalidatePath("/admin/chapters");
@@ -247,7 +277,7 @@ export async function setChapterOfficer(formData: FormData): Promise<void> {
 
 /** Assign (or clear) the verifying officer for a district. */
 export async function setDistrictOfficer(formData: FormData): Promise<void> {
-  const { supabase } = await getAdminClient();
+  const { supabase, tenant } = await getAdminContext();
   const district = required(formData, "district");
   const raw = formData.get("officerId");
   const officerId = typeof raw === "string" && raw.length > 0 ? raw : null;
@@ -255,8 +285,15 @@ export async function setDistrictOfficer(formData: FormData): Promise<void> {
   const { error } = officerId
     ? await supabase
         .from("district_officers")
-        .upsert({ district, officer_id: officerId }, { onConflict: "district" })
-    : await supabase.from("district_officers").delete().eq("district", district);
+        .upsert(
+          { district, officer_id: officerId, tenant_id: tenant.id },
+          { onConflict: "tenant_id,district" },
+        )
+    : await supabase
+        .from("district_officers")
+        .delete()
+        .eq("tenant_id", tenant.id)
+        .eq("district", district);
   if (error) throw new Error(error.message);
 
   revalidatePath("/admin/chapters");
