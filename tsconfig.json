@@ -30,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "lib/branding/theme.check.mts"]
+  "exclude": ["node_modules", "lib/branding/theme.check.mts", "lib/cms/blocks.check.mts"]
 }
