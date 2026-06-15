@@ -6,7 +6,7 @@
  * `Record<string, unknown>` schema constraint.
  */
 
-export type TenantStatus = "active" | "suspended" | "onboarding";
+export type TenantStatus = "active" | "suspended" | "onboarding" | "archived";
 export type TenantRole = "owner" | "admin" | "member";
 
 export type MemberStatus =
