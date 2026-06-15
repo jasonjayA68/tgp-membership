@@ -11,26 +11,46 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
+import { getActiveTenant } from "@/lib/tenant/context";
 import type { Chapter, DistrictOfficer } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Chapters" };
 
 export default async function ChaptersPage() {
   const supabase = await createClient();
+  const tenant = await getActiveTenant();
 
-  const [chaptersResult, adminsResult, districtOfficersResult] =
+  const [chaptersResult, adminRolesResult, districtOfficersResult] =
     await Promise.all([
-      supabase.from("chapters").select("*").order("name"),
       supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("role", ["admin", "super_admin"])
-        .order("full_name"),
-      supabase.from("district_officers").select("district, officer_id"),
+        .from("chapters")
+        .select("*")
+        .eq("tenant_id", tenant.id)
+        .order("name"),
+      supabase
+        .from("tenant_users")
+        .select("user_id")
+        .eq("tenant_id", tenant.id)
+        .in("role", ["owner", "admin"]),
+      supabase
+        .from("district_officers")
+        .select("district, officer_id")
+        .eq("tenant_id", tenant.id),
     ]);
   if (chaptersResult.error) throw chaptersResult.error;
-  if (adminsResult.error) throw adminsResult.error;
+  if (adminRolesResult.error) throw adminRolesResult.error;
   if (districtOfficersResult.error) throw districtOfficersResult.error;
+
+  const adminUserIds = (adminRolesResult.data ?? []).map((r) => r.user_id);
+  const adminsResult = adminUserIds.length
+    ? await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("tenant_id", tenant.id)
+        .in("user_id", adminUserIds)
+        .order("full_name")
+    : { data: [] as { id: string; full_name: string }[], error: null };
+  if (adminsResult.error) throw adminsResult.error;
 
   const chapters = (chaptersResult.data ?? []) as Chapter[];
   const admins = (adminsResult.data ?? []) as {
@@ -45,6 +65,7 @@ export default async function ChaptersPage() {
       supabase
         .from("profiles")
         .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tenant.id)
         .eq("chapter_id", c.id)
         .then((r) => {
           if (r.error) throw r.error;
