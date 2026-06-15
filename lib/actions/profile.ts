@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
+import { getActiveTenant } from "@/lib/tenant/context";
+import { fraternalToCustomFields } from "@/lib/profile";
 
 export type ProfileState = {
   error?: string;
@@ -87,22 +89,28 @@ export async function updateProfile(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Your session has expired. Please sign in again." };
 
-  // Privileged columns (role/status/member_id/chapter) are guarded by a DB
+  const tenant = await getActiveTenant();
+
+  // Fraternal/custom fields are stored in custom_fields (the tenant's schema).
+  // Privileged columns (status/member_id/chapter/tenant) are guarded by a DB
   // trigger, so this can only ever touch the member's own biographical fields.
   const { error } = await supabase
     .from("profiles")
     .update({
       full_name: parsed.data.fullName,
       batch_year: parsed.data.batchYear,
-      alexis_name: parsed.data.alexisName,
-      batch_name: parsed.data.batchName,
-      date_survived: parsed.data.dateSurvived,
-      gt_name: parsed.data.gtName,
-      gt_number: parsed.data.gtNumber,
-      mww_name: parsed.data.mwwName,
-      mww_number: parsed.data.mwwNumber,
-      contact_number: parsed.data.contactNumber,
+      custom_fields: fraternalToCustomFields({
+        alexisName: parsed.data.alexisName,
+        batchName: parsed.data.batchName,
+        dateSurvived: parsed.data.dateSurvived,
+        gtName: parsed.data.gtName,
+        gtNumber: parsed.data.gtNumber,
+        mwwName: parsed.data.mwwName,
+        mwwNumber: parsed.data.mwwNumber,
+        contactNumber: parsed.data.contactNumber,
+      }),
     })
+    .eq("tenant_id", tenant.id)
     .eq("user_id", user.id);
 
   if (error) return { error: error.message };
