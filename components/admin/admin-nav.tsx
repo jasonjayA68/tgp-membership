@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, Building2, ScrollText } from "lucide-react";
+import { Users, Building2, ScrollText, LayoutTemplate } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { tenantHref } from "@/lib/tenant/links";
@@ -11,6 +11,7 @@ const LINKS = [
   { href: "/admin", label: "Members", icon: Users, exact: true },
   { href: "/admin/chapters", label: "Chapters", icon: Building2 },
   { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
+  { href: "/admin/homepage", label: "Homepage", icon: LayoutTemplate },
 ];
 
 export function AdminNav({ basePath }: { basePath: string }) {
