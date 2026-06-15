@@ -5,7 +5,7 @@ import { Camera, IdCard, ShieldCheck, Sparkles, Sun, UserCog } from "lucide-reac
 import { AvatarUploader } from "@/components/profile/avatar-uploader";
 import { ProfileForm } from "@/components/profile/profile-form";
 import { StatusBadge } from "@/components/brand/status-badge";
-import { TgpSeal } from "@/components/brand/seal";
+import { Brandmark } from "@/components/brand/brandmark";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { getAuth } from "@/lib/auth";
@@ -187,7 +187,7 @@ export default async function ProfilePage() {
                 </dl>
 
                 <div className="flex items-center gap-2.5 border-t border-gold/20 px-5 py-4 text-[11px] text-muted-foreground sm:px-6">
-                  <TgpSeal className="size-7 shrink-0 rounded-full" />
+                  <Brandmark name={auth.tenant.name} logoUrl={auth.tenant.logo_url} className="size-7 shrink-0 rounded-full" />
                   <p className="text-pretty">
                     Maintained by the Tau Gamma Phi administration. To correct
                     these fields, contact your chapter.

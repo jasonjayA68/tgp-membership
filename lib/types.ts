@@ -144,6 +144,8 @@ export type MemberCard = {
   tenant_name: string;
   tenant_slug: string;
   tenant_logo_url: string | null;
+  tenant_primary_color: string | null;
+  tenant_secondary_color: string | null;
   public_fields: PublicField[];
 };
 

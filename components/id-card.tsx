@@ -1,7 +1,6 @@
-import { TgpSeal } from "@/components/brand/seal";
+import { Brandmark } from "@/components/brand/brandmark";
 import { StatusBadge } from "@/components/brand/status-badge";
 import { Avatar } from "@/components/ui/avatar";
-import { SITE } from "@/lib/constants";
 import type { MemberStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +14,8 @@ export interface IdCardData {
   batchName?: string | null;
   status: MemberStatus;
   photoUrl: string | null;
+  orgName: string;
+  orgLogoUrl: string | null;
 }
 
 function Detail({
@@ -75,10 +76,10 @@ export function IdCard({
       {/* Header band */}
       <div className="relative z-10 flex items-center justify-between gap-2 border-b border-gold/25 bg-gradient-to-r from-gold/15 via-gold/5 to-transparent px-5 py-3">
         <div className="flex items-center gap-2.5">
-          <TgpSeal className="size-8" />
+          <Brandmark name={data.orgName} logoUrl={data.orgLogoUrl} className="size-8" />
           <div className="leading-none">
             <div className="tgp-display text-[12px] font-bold tracking-[0.18em] text-foreground">
-              TAU GAMMA PHI
+              {data.orgName}
             </div>
             <div className="mt-1 text-[8px] tracking-[0.3em] text-gold/70 uppercase">
               Member Identification
@@ -134,14 +135,15 @@ export function IdCard({
       {/* Footer band */}
       <div className="relative z-10 flex items-center justify-between gap-2 px-5 py-2.5">
         <span className="tgp-mono text-[9px] tracking-wider text-gold/60">
-          {data.memberId ?? "TGP-————"}
+          {data.memberId ?? "—"}
         </span>
-        <span className="tgp-eyebrow text-[7px] text-gold/60">{SITE.motto}</span>
+        <span className="tgp-eyebrow text-[7px] text-gold/60">{data.orgName}</span>
       </div>
 
       {/* Watermark seal */}
-      <TgpSeal
-        title=""
+      <Brandmark
+        name={data.orgName}
+        logoUrl={data.orgLogoUrl}
         className="pointer-events-none absolute -right-10 -bottom-12 -z-0 size-48 opacity-[0.06]"
       />
     </div>

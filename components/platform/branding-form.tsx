@@ -45,12 +45,36 @@ export function BrandingForm({
         <Input id="logo_url" name="logo_url" defaultValue={logoUrl ?? ""} placeholder="https://…/logo.png" />
       </Field>
       <Field>
-        <Label htmlFor="primary_color">Primary color</Label>
-        <Input id="primary_color" name="primary_color" defaultValue={primaryColor ?? ""} placeholder="#C8A24B" />
+        <Label htmlFor="primary_color">Primary color (accent)</Label>
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            aria-label="Primary color"
+            defaultValue={primaryColor ?? "#e9b82e"}
+            onChange={(e) => {
+              const t = document.getElementById("primary_color") as HTMLInputElement | null;
+              if (t) t.value = e.target.value;
+            }}
+            className="size-9 shrink-0 cursor-pointer rounded border border-border bg-transparent"
+          />
+          <Input id="primary_color" name="primary_color" defaultValue={primaryColor ?? ""} placeholder="#e9b82e" />
+        </div>
       </Field>
       <Field>
-        <Label htmlFor="secondary_color">Secondary color</Label>
-        <Input id="secondary_color" name="secondary_color" defaultValue={secondaryColor ?? ""} placeholder="#0B0B0C" />
+        <Label htmlFor="secondary_color">Secondary color (surface)</Label>
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            aria-label="Secondary color"
+            defaultValue={secondaryColor ?? "#050505"}
+            onChange={(e) => {
+              const t = document.getElementById("secondary_color") as HTMLInputElement | null;
+              if (t) t.value = e.target.value;
+            }}
+            className="size-9 shrink-0 cursor-pointer rounded border border-border bg-transparent"
+          />
+          <Input id="secondary_color" name="secondary_color" defaultValue={secondaryColor ?? ""} placeholder="#050505" />
+        </div>
       </Field>
       <SubmitButton size="sm" pendingText="Saving…">
         <Paintbrush />
