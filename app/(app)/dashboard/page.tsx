@@ -68,6 +68,8 @@ export default async function DashboardPage() {
     batchName: profile?.batch_name ?? null,
     status,
     photoUrl: profile?.photo_url ?? null,
+    orgName: tenant.name,
+    orgLogoUrl: tenant.logo_url,
   };
 
   const firstName = (

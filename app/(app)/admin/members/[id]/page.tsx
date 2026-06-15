@@ -127,6 +127,8 @@ export default async function MemberDetailPage({
     batchName: profile.batch_name,
     status: profile.status,
     photoUrl: profile.photo_url,
+    orgName: auth.tenant.name,
+    orgLogoUrl: auth.tenant.logo_url,
   };
 
   const fraternalRecord: { label: string; value: string | null }[] = [
