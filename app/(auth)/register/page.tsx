@@ -13,7 +13,13 @@ import {
 
 export const metadata: Metadata = { title: "Register" };
 
-export default function RegisterPage() {
+export default async function RegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tenant?: string }>;
+}) {
+  const { tenant } = await searchParams;
+
   return (
     <Card className="mx-auto w-full max-w-2xl border-gold/30 tgp-frame tgp-glow">
       <CardHeader className="text-center">
@@ -24,13 +30,13 @@ export default function RegisterPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <RegisterForm />
+        <RegisterForm tenant={typeof tenant === "string" ? tenant : undefined} />
       </CardContent>
       <CardFooter className="justify-center border-t border-border pt-6">
         <p className="text-sm text-muted-foreground">
           Already a member?{" "}
           <Link
-            href="/login"
+            href={tenant ? `/login?tenant=${encodeURIComponent(tenant)}` : "/login"}
             className="font-medium text-gold underline-offset-4 hover:underline"
           >
             Sign in

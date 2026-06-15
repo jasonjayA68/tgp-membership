@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 import { ChapterForm } from "@/components/admin/chapter-form";
 import { ChapterRow } from "@/components/admin/chapter-row";
@@ -19,6 +20,7 @@ export const metadata: Metadata = { title: "Chapters" };
 export default async function ChaptersPage() {
   const supabase = await createClient();
   const tenant = await getActiveTenant();
+  if (!tenant) notFound();
 
   const [chaptersResult, adminRolesResult, districtOfficersResult] =
     await Promise.all([

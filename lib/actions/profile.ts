@@ -90,6 +90,9 @@ export async function updateProfile(
   if (!user) return { error: "Your session has expired. Please sign in again." };
 
   const tenant = await getActiveTenant();
+  if (!tenant) {
+    return { error: "Your session has expired. Please sign in again." };
+  }
 
   // Fraternal/custom fields are stored in custom_fields (the tenant's schema).
   // Privileged columns (status/member_id/chapter/tenant) are guarded by a DB

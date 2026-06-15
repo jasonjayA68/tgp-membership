@@ -3,8 +3,13 @@ import { ShieldX } from "lucide-react";
 
 import { TgpSeal } from "@/components/brand/seal";
 import { Button } from "@/components/ui/button";
+import { getActiveTenantBasePath } from "@/lib/tenant/context";
+import { tenantHref } from "@/lib/tenant/links";
 
-export default function Forbidden() {
+export default async function Forbidden() {
+  const basePath = await getActiveTenantBasePath();
+  const portalHref = basePath ? tenantHref(basePath, "/dashboard") : "/";
+
   return (
     <main className="flex min-h-svh flex-col items-center justify-center gap-6 px-4 text-center">
       <TgpSeal className="size-20 rounded-full opacity-90" />
@@ -18,7 +23,7 @@ export default function Forbidden() {
         </p>
       </div>
       <Button asChild variant="outline">
-        <Link href="/dashboard">Return to portal</Link>
+        <Link href={portalHref}>Return to portal</Link>
       </Button>
     </main>
   );

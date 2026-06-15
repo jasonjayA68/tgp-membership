@@ -21,6 +21,7 @@ async function getAdminContext() {
   if (!user) throw new Error("Unauthorized");
 
   const tenant = await getActiveTenant();
+  if (!tenant) throw new Error("Unauthorized");
 
   const { data, error } = await supabase
     .from("tenant_users")

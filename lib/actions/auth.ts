@@ -14,7 +14,7 @@ export type AuthState = {
 function safeNext(value: FormDataEntryValue | null): string {
   const next = typeof value === "string" ? value : "";
   // Only allow internal, non-protocol-relative paths (prevents open redirects).
-  return next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+  return next.startsWith("/") && !next.startsWith("//") ? next : "/";
 }
 
 const optionalText = (max = 120) =>
@@ -81,6 +81,11 @@ export async function signUp(
     };
   }
 
+  const tenantSlug = (() => {
+    const v = formData.get("tenantSlug");
+    return typeof v === "string" && v.length > 0 ? v : null;
+  })();
+
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
@@ -90,6 +95,7 @@ export async function signUp(
     options: {
       data: {
         full_name: parsed.data.fullName,
+        tenant_slug: tenantSlug,
         alexis_name: parsed.data.alexisName,
         batch_name: parsed.data.batchName,
         date_survived: parsed.data.dateSurvived,
@@ -114,7 +120,7 @@ export async function signUp(
     };
   }
 
-  redirect("/dashboard");
+  redirect(tenantSlug ? `/t/${tenantSlug}/dashboard` : "/");
 }
 
 const LoginSchema = z.object({
@@ -161,4 +167,22 @@ export async function signOut(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/login");
+}
+
+/** Logged-in user self-joins a tenant as a pending member. */
+export async function requestToJoin(formData: FormData): Promise<void> {
+  const slug = formData.get("tenantSlug");
+  if (typeof slug !== "string" || slug.length === 0) {
+    throw new Error("Missing tenant.");
+  }
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect(`/login?tenant=${encodeURIComponent(slug)}`);
+
+  const { error } = await supabase.rpc("join_tenant_by_slug", { p_slug: slug });
+  if (error) throw new Error(error.message);
+
+  redirect(`/t/${slug}/dashboard`);
 }
