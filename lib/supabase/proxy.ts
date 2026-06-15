@@ -103,17 +103,25 @@ export async function updateSession(request: NextRequest) {
     clean.delete("x-tenant-slug");
     clean.delete("x-tenant-basepath");
 
-    // Global auth routes render same-origin on the custom domain (no tenant gate,
-    // no rewrite into the /t tree) — otherwise the logged-out redirect below
-    // would target /login and loop forever.
-    if (seg0 === "login" || seg0 === "register" || seg0 === "auth") {
-      return rewrite(relPath, request, response, clean);
+    // Custom-domain root → the tenant's public homepage (the front door).
+    if (relPath === "/") {
+      return rewrite(`/t/${tenant.slug}/home`, request, response, clean);
     }
 
-    // Public per-tenant verification + homepage are anonymous. Their real routes
-    // live under app/t/[tenant]/..., so rewrite to the /t/<slug> path.
-    if (seg0 === "id" || seg0 === "home") {
+    // Tenant-scoped public routes (login, register, id, home) render their branded
+    // /t/[tenant] routes. These are anonymous — no auth gate, no loop.
+    if (
+      seg0 === "login" ||
+      seg0 === "register" ||
+      seg0 === "id" ||
+      seg0 === "home"
+    ) {
       return rewrite(`/t/${tenant.slug}${relPath}`, request, response, clean);
+    }
+
+    // The Supabase auth callback stays a global route.
+    if (seg0 === "auth") {
+      return rewrite(relPath, request, response, clean);
     }
 
     // Logged-out → global login carrying the tenant slug + return path.
@@ -146,10 +154,15 @@ export async function updateSession(request: NextRequest) {
     if (!slug) return redirect("/", request, response);
     const rest = "/" + segs.slice(2).join("/");
 
-    // Public per-tenant verification + homepage (/t/[slug]/id|home/...) are
-    // anonymous — strip any spoofed tenant headers and route straight through
-    // (no auth gate).
-    if (segs[2] === "id" || segs[2] === "home") {
+    // Public per-tenant verification, homepage, and the branded login/register
+    // routes are anonymous — strip any spoofed tenant headers and route straight
+    // through (no auth gate).
+    if (
+      segs[2] === "id" ||
+      segs[2] === "home" ||
+      segs[2] === "login" ||
+      segs[2] === "register"
+    ) {
       const clean = new Headers(request.headers);
       clean.delete("x-tenant-id");
       clean.delete("x-tenant-slug");
