@@ -53,9 +53,14 @@ export default async function HomepagePage({
             <Brandmark name={home.tenant_name} logoUrl={home.tenant_logo_url} className="size-9" />
             <span className="tgp-display text-sm font-bold tracking-wide">{home.tenant_name}</span>
           </div>
-          <Button asChild size="sm" variant="outline">
-            <Link href={`/login?tenant=${home.tenant_slug}`}>Sign in</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/t/${home.tenant_slug}/login`}>Sign in</Link>
+            </Button>
+            <Button asChild size="sm">
+              <Link href={`/t/${home.tenant_slug}/register`}>Apply for membership</Link>
+            </Button>
+          </div>
         </div>
       </header>
 
