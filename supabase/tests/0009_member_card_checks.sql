@@ -10,7 +10,7 @@ values ('00000000-0000-0000-0000-000000000000','44444444-4444-4444-4444-44444444
         '{}'::jsonb, '{"full_name":"Probe Card"}'::jsonb, false);
 
 update public.profiles
-   set custom_fields = '{"gt_name":"Juan","gt_number":"0917-000-0001","alexis_name":"Andromeda"}'::jsonb
+   set custom_fields = '{"gt_name":"Juan","gt_number":"0917-000-0001","alexis_name":"Andromeda","contact_number":"0917-999-9999"}'::jsonb
  where user_id = '44444444-4444-4444-4444-444444444444';
 
 insert into public.nfc_cards (tenant_id, profile_id, slug)
@@ -25,6 +25,15 @@ begin
   if r.tenant_name is null then raise exception 'FAIL: tenant_name null'; end if;
   if jsonb_array_length(r.public_fields) < 1 then raise exception 'FAIL: no public_fields'; end if;
   raise notice 'OK: get_member_card -> tenant %, % public field(s)', r.tenant_slug, jsonb_array_length(r.public_fields);
+
+  -- The single most important guarantee: a non-public field never leaks.
+  if exists (
+    select 1 from jsonb_array_elements(r.public_fields) e
+    where e ->> 'key' = 'contact_number'
+  ) then
+    raise exception 'FAIL: non-public field contact_number leaked into public_fields';
+  end if;
+  raise notice 'OK: non-public custom field excluded from public_fields';
 
   -- get_member_card is a pure read (no scan increment).
   select scan_count into before_n from public.nfc_cards where slug = 'probe-card-0009';
