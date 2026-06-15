@@ -277,7 +277,7 @@ export default async function VerifyPage({
         )}
 
         {/* Verify via the responsible officer */}
-        {card.verify_contact_number && (
+        {card.verify_contact_number && card.verify_officer_enabled && (
           <div className="relative z-10 border-t border-gold/20 px-5 py-4">
             <a
               href={`tel:${card.verify_contact_number}`}

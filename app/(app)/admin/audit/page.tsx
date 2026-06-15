@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
+import { requireFeature } from "@/lib/tenant/features";
 import type { AuditLog } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Audit Log" };
@@ -21,6 +22,7 @@ function detailOf(log: AuditLog): string {
 }
 
 export default async function AuditPage() {
+  await requireFeature("audit");
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("audit_logs")

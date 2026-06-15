@@ -13,11 +13,13 @@ import {
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveTenant } from "@/lib/tenant/context";
+import { requireFeature } from "@/lib/tenant/features";
 import type { Chapter, DistrictOfficer } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Chapters" };
 
 export default async function ChaptersPage() {
+  await requireFeature("chapters");
   const supabase = await createClient();
   const tenant = await getActiveTenant();
   if (!tenant) notFound();

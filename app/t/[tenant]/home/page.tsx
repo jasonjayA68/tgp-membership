@@ -37,6 +37,7 @@ export default async function HomepagePage({
   const { tenant } = await params;
   const home = await getHomepage(tenant);
   if (!home) notFound();
+  if (!home.homepage_enabled) notFound();
 
   // Validate stored content; fall back to the default homepage if empty/invalid.
   const parsed = HomeContentSchema.safeParse(home.content_json);

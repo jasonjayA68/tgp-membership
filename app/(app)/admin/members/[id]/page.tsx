@@ -30,7 +30,9 @@ import {
   setMemberStatus,
 } from "@/lib/actions/admin";
 import { requireTenantAdmin } from "@/lib/auth";
+import { isFeatureEnabled } from "@/lib/features";
 import { getActiveTenantBasePath } from "@/lib/tenant/context";
+import { getActiveTenantFeatures } from "@/lib/tenant/features";
 import { tenantHref } from "@/lib/tenant/links";
 import { MEMBER_STATUSES, STATUS_META, TENANT_ROLE_META } from "@/lib/constants";
 import { toProfileView, type ProfileRow } from "@/lib/profile";
@@ -76,6 +78,8 @@ export default async function MemberDetailPage({
 
   const auth = await requireTenantAdmin();
   const basePath = await getActiveTenantBasePath();
+  const features = await getActiveTenantFeatures();
+  const chaptersEnabled = isFeatureEnabled(features, "chapters");
   const isOwner = auth.role === "owner";
   const db = tdb(supabase, auth.tenant.id);
 
@@ -280,19 +284,21 @@ export default async function MemberDetailPage({
                 />
               </FieldRow>
 
-              <FieldRow label="Chapter">
-                <ActionSelect
-                  action={assignChapter}
-                  name="chapterId"
-                  defaultValue={profile.chapter_id ?? ""}
-                  hidden={{ profileId: profile.id }}
-                  ariaLabel="Member chapter"
-                  options={[
-                    { value: "", label: "Unassigned" },
-                    ...chapters.map((c) => ({ value: c.id, label: c.name })),
-                  ]}
-                />
-              </FieldRow>
+              {chaptersEnabled && (
+                <FieldRow label="Chapter">
+                  <ActionSelect
+                    action={assignChapter}
+                    name="chapterId"
+                    defaultValue={profile.chapter_id ?? ""}
+                    hidden={{ profileId: profile.id }}
+                    ariaLabel="Member chapter"
+                    options={[
+                      { value: "", label: "Unassigned" },
+                      ...chapters.map((c) => ({ value: c.id, label: c.name })),
+                    ]}
+                  />
+                </FieldRow>
+              )}
 
               <FieldRow
                 label="Role"
