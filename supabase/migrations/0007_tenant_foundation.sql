@@ -325,3 +325,72 @@ end $$;
 create trigger trg_handle_profile_change
   after update on public.profiles
   for each row execute function public.handle_profile_change();
+
+-- =============================================================================
+-- Public verification RPC — the ONLY anon read path. Shape preserved; fraternal
+-- values sourced from custom_fields. Tenant-aware (district join scoped by tenant).
+-- =============================================================================
+create or replace function public.get_member_card(card_slug text)
+returns table (
+  full_name      text,
+  member_id      text,
+  alexis_name    text,
+  batch_name     text,
+  date_survived  date,
+  gt_name        text,
+  gt_number      text,
+  mww_name       text,
+  mww_number     text,
+  chapter        text,
+  district       text,
+  region         text,
+  batch_year     int,
+  status         public.member_status,
+  photo_url      text,
+  card_active    boolean,
+  verify_contact_name   text,
+  verify_contact_number text
+)
+language plpgsql security definer set search_path = public as $$
+begin
+  update public.nfc_cards
+     set scan_count = scan_count + 1,
+         last_verified_at = now()
+   where slug = card_slug and active = true;
+
+  return query
+  select p.full_name,
+         p.member_id,
+         p.custom_fields ->> 'alexis_name',
+         p.custom_fields ->> 'batch_name',
+         nullif(p.custom_fields ->> 'date_survived', '')::date,
+         p.custom_fields ->> 'gt_name',
+         p.custom_fields ->> 'gt_number',
+         p.custom_fields ->> 'mww_name',
+         p.custom_fields ->> 'mww_number',
+         c.name,
+         c.district,
+         c.region,
+         p.batch_year,
+         p.status,
+         p.photo_url,
+         n.active,
+         coalesce(chap_officer.full_name, dist_officer.full_name),
+         coalesce(nullif(chap_officer.custom_fields ->> 'contact_number', ''),
+                  nullif(dist_officer.custom_fields ->> 'contact_number', ''))
+  from public.nfc_cards n
+  join public.profiles  p on p.id = n.profile_id
+  left join public.chapters c on c.id = p.chapter_id
+  left join public.profiles chap_officer
+         on chap_officer.id = c.verify_officer_id
+        and nullif(chap_officer.custom_fields ->> 'contact_number', '') is not null
+  left join public.district_officers d_off
+         on d_off.tenant_id = p.tenant_id and d_off.district = c.district
+  left join public.profiles dist_officer
+         on dist_officer.id = d_off.officer_id
+        and nullif(dist_officer.custom_fields ->> 'contact_number', '') is not null
+  where n.slug = card_slug;
+end $$;
+
+revoke all on function public.get_member_card(text) from public;
+grant execute on function public.get_member_card(text) to anon, authenticated;
