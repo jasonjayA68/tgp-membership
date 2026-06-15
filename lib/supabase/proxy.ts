@@ -2,7 +2,11 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { env } from "@/lib/env";
-import { resolveTenantForMiddleware } from "@/lib/tenant/resolve";
+import { isCanonicalHost, normalizeHost } from "@/lib/tenant/host";
+import {
+  resolveTenantByHost,
+  resolveTenantForMiddleware,
+} from "@/lib/tenant/resolve";
 
 /** Bare workspace paths that are only valid under /t/[slug] in subpath mode. */
 const WORKSPACE_PREFIXES = ["/dashboard", "/admin", "/profile"];
@@ -74,6 +78,54 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
+
+  // ---- Custom-domain host mode ----------------------------------------------
+  // A request on a non-canonical Host is a tenant's verified custom domain; its
+  // whole path is tenant-relative (a transparent alias for /t/[slug]).
+  const host = normalizeHost(request.headers.get("host"));
+  if (host && !isCanonicalHost(host, env.APP_HOST)) {
+    const tenant = await resolveTenantByHost(host);
+    if (!tenant) return rewrite("/workspace-not-found", request, response);
+
+    const seg0 = path.split("/").filter(Boolean)[0];
+
+    // Public per-tenant verification + homepage are anonymous. Their real routes
+    // live under app/t/[tenant]/..., so rewrite to the /t/<slug> path (stripping
+    // any spoofed tenant headers).
+    if (seg0 === "id" || seg0 === "home") {
+      const clean = new Headers(request.headers);
+      clean.delete("x-tenant-id");
+      clean.delete("x-tenant-slug");
+      clean.delete("x-tenant-basepath");
+      return rewrite(`/t/${tenant.slug}${path}`, request, response, clean);
+    }
+
+    // Logged-out → global login carrying the tenant slug + return path.
+    if (!user) {
+      return redirect(
+        `/login?tenant=${encodeURIComponent(tenant.slug)}&next=${encodeURIComponent(path)}`,
+        request,
+        response,
+      );
+    }
+
+    // Authed workspace: inject trusted headers (empty basepath = root-relative
+    // links) and rewrite to the flat (app) route; root → dashboard.
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.delete("x-tenant-id");
+    requestHeaders.delete("x-tenant-slug");
+    requestHeaders.delete("x-tenant-basepath");
+    requestHeaders.set("x-tenant-id", tenant.id);
+    requestHeaders.set("x-tenant-slug", tenant.slug);
+    requestHeaders.set("x-tenant-basepath", "");
+
+    return rewrite(
+      path === "/" ? "/dashboard" : path,
+      request,
+      response,
+      requestHeaders,
+    );
+  }
 
   // ---- Tenant-scoped routes: /t/[slug]/<rest> -------------------------------
   if (path === "/t" || path.startsWith("/t/")) {
