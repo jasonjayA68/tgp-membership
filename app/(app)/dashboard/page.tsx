@@ -38,7 +38,7 @@ export default async function DashboardPage() {
   const auth = await getAuth();
   if (!auth) redirect("/login");
 
-  const { profile, user } = auth;
+  const { profile, user, tenant } = auth;
   const status = profile?.status ?? "pending";
   const meta = STATUS_META[status];
 
@@ -54,7 +54,9 @@ export default async function DashboardPage() {
   const card = cardResult.data;
 
   const baseUrl = await getBaseUrl();
-  const verifyUrl = card?.active ? verificationUrl(baseUrl, card.slug) : null;
+  const verifyUrl = card?.active
+    ? verificationUrl(baseUrl, tenant.slug, card.slug)
+    : null;
 
   const cardData: IdCardData = {
     fullName: profile?.full_name || user.email || "Member",
@@ -254,7 +256,7 @@ export default async function DashboardPage() {
                   <CopyButton value={verifyUrl} className="flex-1" />
                   <Button asChild variant="secondary" size="sm" className="flex-1">
                     <Link
-                      href={`/id/${card.slug}`}
+                      href={verifyUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
