@@ -38,6 +38,16 @@ begin
   end if;
   raise notice 'OK: 4 branding storage policies present';
 
+  -- 5. The audit_logs INSERT policy exists (so action audit writes succeed).
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'audit_logs'
+      and policyname = 'audit_insert_admin' and cmd = 'INSERT'
+  ) then
+    raise exception 'FAIL: audit_insert_admin policy missing';
+  end if;
+  raise notice 'OK: audit_logs insert policy present';
+
   raise notice 'ALL 0016 CHECKS PASSED';
 end $$;
 

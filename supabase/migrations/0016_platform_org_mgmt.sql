@@ -31,3 +31,15 @@ create policy branding_admin_update on storage.objects for update
   using (bucket_id = 'branding' and public.is_platform_admin());
 create policy branding_admin_delete on storage.objects for delete
   using (bucket_id = 'branding' and public.is_platform_admin());
+
+-- audit_logs INSERT: the new platform/tenant-admin actions write audit rows via
+-- the RLS client (0007 shipped a SELECT-only policy). Integrity: you may only
+-- write a row attributed to yourself, and only for a tenant you administer (or
+-- as a platform admin). SECURITY DEFINER writes (e.g. assign_tenant_owner) still
+-- bypass RLS and are unaffected.
+drop policy if exists audit_insert_admin on public.audit_logs;
+create policy audit_insert_admin on public.audit_logs for insert
+  with check (
+    performed_by = auth.uid()
+    and (public.is_platform_admin() or public.is_tenant_admin(tenant_id))
+  );
