@@ -8,12 +8,17 @@ from public.tenants where slug = 'tgp'
 on conflict (tenant_id, page_type) do update set content_json = excluded.content_json;
 
 do $$
-declare r record;
+declare r record; direct bigint;
 begin
   select * into r from public.get_tenant_homepage('tgp');
   if r.tenant_slug <> 'tgp' then raise exception 'FAIL: slug %', r.tenant_slug; end if;
   if r.content_json -> 'blocks' -> 0 ->> 'type' <> 'hero' then raise exception 'FAIL: blocks not returned'; end if;
-  if r.member_count is null then raise exception 'FAIL: member_count null'; end if;
+  select count(*) into direct
+  from public.profiles pr join public.tenants t on t.id = pr.tenant_id
+  where t.slug = 'tgp' and pr.status = 'active';
+  if r.member_count is distinct from direct then
+    raise exception 'FAIL: member_count % <> direct %', r.member_count, direct;
+  end if;
   raise notice 'OK: get_tenant_homepage returns content + branding + count';
 end $$;
 
@@ -39,13 +44,10 @@ do $$
 begin
   begin
     insert into public.tenant_pages (tenant_id, page_type, content_json)
-    select id, 'home', '{"blocks":[]}'::jsonb from public.tenants where slug = 'tgp';
+    select id, 'home-probe', '{"blocks":[]}'::jsonb from public.tenants where slug = 'tgp';
     raise exception 'FAIL: non-admin wrote tenant_pages';
   exception
     when insufficient_privilege then raise notice 'OK: RLS blocked non-admin write';
-    when others then
-      if position('FAIL' in sqlerrm) > 0 then raise; end if;
-      raise notice 'OK: non-admin write rejected (%)', sqlerrm;
   end;
 end $$;
 reset role;
