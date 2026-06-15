@@ -3,7 +3,7 @@ import "server-only";
 import type { CSSProperties } from "react";
 
 import { buildTenantTheme } from "@/lib/branding/theme";
-import { SITE } from "@/lib/constants";
+import { PLATFORM } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveTenant } from "@/lib/tenant/context";
 import type { ResolvedTenant } from "@/lib/types";
@@ -14,7 +14,7 @@ export type Brand = { name: string; logoUrl: string | null };
 export async function getBrand(): Promise<Brand> {
   const tenant = await getActiveTenant();
   if (tenant) return { name: tenant.name, logoUrl: tenant.logo_url };
-  return { name: SITE.name, logoUrl: null };
+  return { name: PLATFORM.name, logoUrl: null };
 }
 
 /** Inline `style` of CSS-variable overrides for a tenant's colors ({} = default). */
@@ -44,5 +44,5 @@ export async function brandForSlug(
       };
     }
   }
-  return { brand: { name: SITE.name, logoUrl: null }, primary: null, secondary: null };
+  return { brand: { name: PLATFORM.name, logoUrl: null }, primary: null, secondary: null };
 }

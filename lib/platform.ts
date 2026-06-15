@@ -28,6 +28,19 @@ export async function requirePlatformAdmin(): Promise<{
   return user;
 }
 
+/** Boolean platform-admin check (no redirect) — for conditional UI. */
+export async function isPlatformAdmin(): Promise<boolean> {
+  const user = await getSessionUser();
+  if (!user) return false;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("platform_admins")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  return Boolean(data);
+}
+
 export type TenantWithStats = Tenant & {
   member_count: number;
   active_count: number;
