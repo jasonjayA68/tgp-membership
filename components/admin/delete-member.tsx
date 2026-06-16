@@ -31,7 +31,7 @@ export function DeleteMember({
   return (
     <form action={deleteMember} className="space-y-3">
       <input type="hidden" name="profileId" value={profileId} />
-      <p className="text-sm text-muted-foreground">
+      <p id="delete-member-warning" className="text-sm text-muted-foreground">
         This permanently removes the member, their digital ID card, and their
         membership in this organization. Their login account is not deleted and
         they may re-apply. This cannot be undone.
@@ -45,6 +45,7 @@ export function DeleteMember({
           id="confirmName"
           name="confirmName"
           autoComplete="off"
+          aria-describedby="delete-member-warning"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
           placeholder={fullName}
