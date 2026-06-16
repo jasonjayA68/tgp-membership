@@ -1,13 +1,14 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
 import {
   CheckCircle2,
   CircleAlert,
   ImagePlus,
+  Loader2,
   Paintbrush,
   Trash2,
-  Upload,
 } from "lucide-react";
 
 import { Brandmark } from "@/components/brand/brandmark";
@@ -28,6 +29,18 @@ const initial: PlatformState = {};
 const MAX_BYTES = 2 * 1024 * 1024;
 const ALLOWED = ["image/png", "image/jpeg", "image/webp"];
 
+/** Inline "Uploading…" indicator bound to the enclosing logo form. */
+function UploadingNote() {
+  const { pending } = useFormStatus();
+  if (!pending) return null;
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-gold">
+      <Loader2 className="size-3.5 animate-spin" />
+      Uploading…
+    </span>
+  );
+}
+
 export function BrandingForm({
   tenantId,
   name,
@@ -45,35 +58,34 @@ export function BrandingForm({
   const [colorState, colorAction] = useActionState(updateTenantBranding, initial);
   const [preview, setPreview] = useState<string | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
-  const [hasFile, setHasFile] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const input = e.target;
+    const form = input.form;
+    const file = input.files?.[0];
     if (!file) {
       setPreview(null);
-      setHasFile(false);
       return;
     }
     if (!ALLOWED.includes(file.type)) {
       setClientError("Use a PNG, JPG, or WebP image.");
-      e.target.value = "";
+      input.value = "";
       setPreview(null);
-      setHasFile(false);
       return;
     }
     if (file.size > MAX_BYTES) {
       setClientError(
         `That image is ${(file.size / 1024 / 1024).toFixed(1)} MB. Please choose one under 2 MB.`,
       );
-      e.target.value = "";
+      input.value = "";
       setPreview(null);
-      setHasFile(false);
       return;
     }
     setClientError(null);
     setPreview(URL.createObjectURL(file));
-    setHasFile(true);
+    // Upload immediately — no separate save button to miss.
+    form?.requestSubmit();
   }
 
   return (
@@ -101,12 +113,11 @@ export function BrandingForm({
                 <ImagePlus />
                 Choose logo
               </Button>
-              <SubmitButton size="sm" variant="secondary" pendingText="Uploading…" disabled={!hasFile}>
-                <Upload />
-                Upload logo
-              </SubmitButton>
+              <UploadingNote />
             </div>
-            <p className="text-xs text-muted-foreground">PNG, JPG, or WebP · up to 2 MB.</p>
+            <p className="text-xs text-muted-foreground">
+              PNG, JPG, or WebP · up to 2 MB — uploads automatically.
+            </p>
           </form>
         </div>
 
