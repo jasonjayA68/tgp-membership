@@ -7,6 +7,9 @@
 -- account in auth.users is NOT touched (no service-role key; they may re-apply).
 -- nfc_cards.profile_id is ON DELETE CASCADE and chapters.verify_officer_id is
 -- ON DELETE SET NULL, so deleting the profile is FK-safe.
+-- district_officers.officer_id is ON DELETE CASCADE, so deleting the profile
+-- of a member who is a district verifying officer also removes that officer row
+-- (intended — a deleted person cannot remain an officer).
 -- =============================================================================
 
 create or replace function public.delete_member(p_profile_id uuid)
@@ -22,7 +25,7 @@ begin
     from public.profiles
    where id = p_profile_id;
 
-  if v_tenant_id is null then
+  if not found then
     raise exception 'member not found';
   end if;
 
