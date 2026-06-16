@@ -1,10 +1,19 @@
 "use client";
 
-import { useActionState } from "react";
-import { CheckCircle2, CircleAlert, Paintbrush, Trash2, Upload } from "lucide-react";
+import { useActionState, useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
+import {
+  CheckCircle2,
+  CircleAlert,
+  ImagePlus,
+  Loader2,
+  Paintbrush,
+  Trash2,
+} from "lucide-react";
 
 import { Brandmark } from "@/components/brand/brandmark";
 import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +26,20 @@ import {
 } from "@/lib/actions/platform";
 
 const initial: PlatformState = {};
+const MAX_BYTES = 2 * 1024 * 1024;
+const ALLOWED = ["image/png", "image/jpeg", "image/webp"];
+
+/** Inline "Uploading…" indicator bound to the enclosing logo form. */
+function UploadingNote() {
+  const { pending } = useFormStatus();
+  if (!pending) return null;
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-gold">
+      <Loader2 className="size-3.5 animate-spin" />
+      Uploading…
+    </span>
+  );
+}
 
 export function BrandingForm({
   tenantId,
@@ -33,10 +56,77 @@ export function BrandingForm({
 }) {
   const [logoState, logoAction] = useActionState(uploadTenantLogo, initial);
   const [colorState, colorAction] = useActionState(updateTenantBranding, initial);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [clientError, setClientError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.target;
+    const form = input.form;
+    const file = input.files?.[0];
+    if (!file) {
+      setPreview(null);
+      return;
+    }
+    if (!ALLOWED.includes(file.type)) {
+      setClientError("Use a PNG, JPG, or WebP image.");
+      input.value = "";
+      setPreview(null);
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setClientError(
+        `That image is ${(file.size / 1024 / 1024).toFixed(1)} MB. Please choose one under 2 MB.`,
+      );
+      input.value = "";
+      setPreview(null);
+      return;
+    }
+    setClientError(null);
+    setPreview(URL.createObjectURL(file));
+    // Upload immediately — no separate save button to miss.
+    form?.requestSubmit();
+  }
 
   return (
     <div className="space-y-6">
       <div className="space-y-3">
+        <div className="flex items-center gap-4">
+          <Brandmark name={name} logoUrl={preview ?? logoUrl} className="size-16 text-lg" />
+          <form action={logoAction} className="flex flex-col gap-2">
+            <input type="hidden" name="tenantId" value={tenantId} />
+            <input
+              ref={inputRef}
+              type="file"
+              name="logo"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={onFileChange}
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => inputRef.current?.click()}
+              >
+                <ImagePlus />
+                Choose logo
+              </Button>
+              <UploadingNote />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              PNG, JPG, or WebP · up to 2 MB — uploads automatically.
+            </p>
+          </form>
+        </div>
+
+        {clientError && (
+          <Alert variant="danger">
+            <CircleAlert />
+            <span>{clientError}</span>
+          </Alert>
+        )}
         {logoState.error && (
           <Alert variant="danger">
             <CircleAlert />
@@ -49,26 +139,7 @@ export function BrandingForm({
             <span>{logoState.notice}</span>
           </Alert>
         )}
-        <div className="flex items-start gap-3">
-          <Brandmark name={name} logoUrl={logoUrl} className="size-12 text-base" />
-          <div className="min-w-0 flex-1 space-y-1">
-            <form action={logoAction} className="flex flex-wrap items-center gap-2">
-              <input type="hidden" name="tenantId" value={tenantId} />
-              <Input
-                type="file"
-                name="logo"
-                accept="image/png,image/jpeg,image/webp"
-                required
-                className="max-w-[220px]"
-              />
-              <SubmitButton size="sm" pendingText="Uploading…">
-                <Upload />
-                Upload logo
-              </SubmitButton>
-            </form>
-            <p className="text-xs text-muted-foreground">PNG, JPG, or WebP · up to 2 MB.</p>
-          </div>
-        </div>
+
         {logoUrl && (
           <form action={removeTenantLogo}>
             <input type="hidden" name="tenantId" value={tenantId} />
