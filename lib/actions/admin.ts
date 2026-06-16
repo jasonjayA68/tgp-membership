@@ -6,7 +6,8 @@ import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { MEMBER_STATUSES } from "@/lib/constants";
-import { getActiveTenant } from "@/lib/tenant/context";
+import { getActiveTenant, getActiveTenantBasePath } from "@/lib/tenant/context";
+import { tenantHref } from "@/lib/tenant/links";
 import { fraternalToCustomFields } from "@/lib/profile";
 import type { MemberStatus, TenantRole } from "@/lib/types";
 
@@ -150,7 +151,7 @@ export async function updateMemberProfile(
     };
   }
 
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("profiles")
     .update({
       full_name: parsed.data.fullName,
@@ -167,8 +168,11 @@ export async function updateMemberProfile(
       }),
     })
     .eq("id", profileId)
-    .eq("tenant_id", tenant.id);
+    .eq("tenant_id", tenant.id)
+    .select("user_id")
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!updated) return { error: "Member not found." };
 
   // Biographical edits are not covered by the handle_profile_change trigger
   // (it audits status/chapter only), so record one explicitly.
@@ -176,7 +180,7 @@ export async function updateMemberProfile(
     tenant_id: tenant.id,
     action: "member_updated",
     performed_by: user.id,
-    target_user: null,
+    target_user: updated.user_id,
     metadata: { profile_id: profileId },
   });
 
@@ -186,7 +190,7 @@ export async function updateMemberProfile(
 
 /** Hard-delete a member from THIS org (profiles + nfc_cards + tenant_users). */
 export async function deleteMember(formData: FormData): Promise<void> {
-  const { supabase, tenant } = await getAdminContext();
+  const { supabase } = await getAdminContext();
   const profileId = required(formData, "profileId");
 
   const { error } = await supabase.rpc("delete_member", {
@@ -195,9 +199,10 @@ export async function deleteMember(formData: FormData): Promise<void> {
   if (error) throw new Error(error.message);
 
   revalidatePath("/admin");
-  // The member detail page no longer exists; return to the members list. Use the
-  // tenant-scoped path so it resolves in both path mode and custom-domain mode.
-  redirect(`/t/${tenant.slug}/admin`);
+  // The member detail page no longer exists; return to the members list. Resolve
+  // the tenant base path so it works in both path mode and custom-domain mode.
+  const basePath = await getActiveTenantBasePath();
+  redirect(tenantHref(basePath, "/admin"));
 }
 
 /** Assign (or clear) a member's chapter. */
