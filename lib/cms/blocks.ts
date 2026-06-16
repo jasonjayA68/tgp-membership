@@ -61,9 +61,22 @@ export type HomeContent = z.infer<typeof HomeContentSchema>;
 export const DEFAULT_HOME: HomeContent = {
   blocks: [
     {
-      id: "default-hero",
-      type: "hero",
-      props: { heading: "", subheading: "", ctaLabel: "Sign in", ctaHref: null },
+      id: "default-about",
+      type: "text",
+      props: {
+        heading: "About",
+        body: "Welcome to the official membership registry. Every member carries a tamper-resistant digital ID, verifiable in real time via NFC. Sign in to access your member portal, or apply for membership to get started.",
+      },
+    },
+    {
+      id: "default-members",
+      type: "members",
+      props: { heading: "Our community" },
+    },
+    {
+      id: "default-cta",
+      type: "cta",
+      props: { heading: "Ready to join?", label: "Apply for membership", href: null },
     },
   ],
 };

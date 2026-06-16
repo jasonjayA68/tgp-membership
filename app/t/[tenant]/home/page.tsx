@@ -8,6 +8,7 @@ import { BlockRenderer } from "@/components/cms/home-blocks";
 import { Button } from "@/components/ui/button";
 import { tenantThemeStyle } from "@/lib/branding/brand";
 import { DEFAULT_HOME, HomeContentSchema } from "@/lib/cms/blocks";
+import { HOMEPAGE } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
 import type { HomepageResult } from "@/lib/types";
 
@@ -64,11 +65,49 @@ export default async function HomepagePage({
         </div>
       </header>
 
+      <section className="relative isolate overflow-hidden px-4 py-16 text-center sm:py-24">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[480px] bg-[radial-gradient(ellipse_82%_55%_at_50%_0%,color-mix(in_oklab,var(--gold)_18%,transparent),color-mix(in_oklab,var(--gold)_6%,transparent)_40%,transparent_72%)]"
+        />
+        <span className="relative inline-block">
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 -z-10 scale-[1.9] rounded-full bg-[radial-gradient(circle,color-mix(in_oklab,var(--gold)_34%,transparent),transparent_68%)] blur-lg"
+          />
+          <Brandmark
+            name={home.tenant_name}
+            logoUrl={home.tenant_logo_url}
+            className="size-24 tgp-frame tgp-glow sm:size-28"
+          />
+        </span>
+        <p className="tgp-eyebrow mt-6 text-[11px] text-gold/80">{HOMEPAGE.eyebrow}</p>
+        <h1 className="tgp-display tgp-gild mt-3 text-4xl font-black tracking-[0.06em] sm:text-6xl">
+          {home.tenant_name}
+        </h1>
+        <p className="tgp-eyebrow mt-3 text-xs text-foreground/70">{HOMEPAGE.tagline}</p>
+        <p className="mx-auto mt-5 max-w-xl text-balance text-muted-foreground">
+          {HOMEPAGE.subtext}
+        </p>
+        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <Button asChild size="lg">
+            <Link href={`/t/${home.tenant_slug}/login`}>Sign in</Link>
+          </Button>
+          <Button asChild size="lg" variant="outline">
+            <Link href={`/t/${home.tenant_slug}/register`}>Apply for membership</Link>
+          </Button>
+        </div>
+      </section>
+
       <div className="mx-auto max-w-3xl px-4 pb-16">
         {content.blocks.map((block) => (
           <BlockRenderer key={block.id} block={block} ctx={ctx} />
         ))}
       </div>
+
+      <footer className="border-t border-border py-6 text-center text-[11px] tracking-widest text-muted-foreground uppercase">
+        © {home.tenant_name}
+      </footer>
     </main>
   );
 }

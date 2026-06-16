@@ -19,7 +19,7 @@ function paragraphs(body: string) {
 export function BlockRenderer({ block, ctx }: { block: Block; ctx: BlockContext }) {
   switch (block.type) {
     case "hero": {
-      const href = block.props.ctaHref ?? `/login?tenant=${ctx.slug}`;
+      const href = block.props.ctaHref ?? `/t/${ctx.slug}/login`;
       return (
         <section className="py-12 text-center">
           <h1 className="tgp-display tgp-gild text-3xl font-black tracking-tight sm:text-5xl">
@@ -71,7 +71,7 @@ export function BlockRenderer({ block, ctx }: { block: Block; ctx: BlockContext 
         <section className="my-6 rounded-xl border border-gold/30 bg-card p-8 text-center tgp-frame">
           <h2 className="tgp-display text-2xl font-bold">{block.props.heading}</h2>
           <Button asChild size="lg" className="mt-4">
-            <Link href={block.props.href ?? `/login?tenant=${ctx.slug}`}>{block.props.label}</Link>
+            <Link href={block.props.href ?? `/t/${ctx.slug}/register`}>{block.props.label}</Link>
           </Button>
         </section>
       );
