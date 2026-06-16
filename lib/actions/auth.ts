@@ -14,7 +14,9 @@ export type AuthState = {
 function safeNext(value: FormDataEntryValue | null): string {
   const next = typeof value === "string" ? value : "";
   // Only allow internal, non-protocol-relative paths (prevents open redirects).
-  return next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  return next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\")
+    ? next
+    : "/";
 }
 
 const optionalText = (max = 120) =>
