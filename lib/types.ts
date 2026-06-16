@@ -269,6 +269,7 @@ export type Database = {
         Args: { p_tenant_id: string; p_email: string };
         Returns: undefined;
       };
+      delete_member: { Args: { p_profile_id: string }; Returns: undefined };
       platform_tenant_stats: { Args: Record<string, never>; Returns: TenantStats[] };
       get_tenant_homepage: { Args: { p_slug: string }; Returns: HomepageResult[] };
     };

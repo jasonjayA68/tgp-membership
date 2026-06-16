@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 
 import { ActionSelect } from "@/components/admin/action-select";
+import { EditMemberForm } from "@/components/admin/edit-member-form";
+import { DeleteMember } from "@/components/admin/delete-member";
 import { IdCard, type IdCardData } from "@/components/id-card";
 import { QrCode } from "@/components/qr-code";
 import { Button } from "@/components/ui/button";
@@ -353,6 +355,27 @@ export default async function MemberDetailPage({
 
           <Card>
             <CardHeader>
+              <CardTitle className="text-base">Edit details</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <EditMemberForm
+                profileId={profile.id}
+                fullName={profile.full_name}
+                batchYear={profile.batch_year}
+                alexisName={profile.alexis_name}
+                batchName={profile.batch_name}
+                dateSurvived={profile.date_survived}
+                gtName={profile.gt_name}
+                gtNumber={profile.gt_number}
+                mwwName={profile.mww_name}
+                mwwNumber={profile.mww_number}
+                contactNumber={profile.contact_number}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle className="text-base">Recent activity</CardTitle>
             </CardHeader>
             <CardContent>
@@ -379,6 +402,20 @@ export default async function MemberDetailPage({
                   No recorded activity yet.
                 </p>
               )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-destructive/40">
+            <CardHeader>
+              <CardTitle className="text-base text-destructive">
+                Danger zone
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <DeleteMember
+                profileId={profile.id}
+                fullName={profile.full_name}
+              />
             </CardContent>
           </Card>
         </div>

@@ -1,10 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { MEMBER_STATUSES } from "@/lib/constants";
-import { getActiveTenant } from "@/lib/tenant/context";
+import { getActiveTenant, getActiveTenantBasePath } from "@/lib/tenant/context";
+import { tenantHref } from "@/lib/tenant/links";
+import { fraternalToCustomFields } from "@/lib/profile";
 import type { MemberStatus, TenantRole } from "@/lib/types";
 
 /**
@@ -73,6 +77,132 @@ export async function setMemberStatus(formData: FormData): Promise<void> {
 
   revalidateMember(profileId);
   revalidatePath("/dashboard");
+}
+
+export type AdminMemberState = {
+  error?: string;
+  notice?: string;
+  fieldErrors?: Record<string, string[]>;
+};
+
+const optionalText = (max = 120) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : null));
+
+// Same field set the member-facing profile form validates (lib/actions/profile.ts),
+// so an admin edit and a self-edit accept identical input.
+const MemberEditSchema = z.object({
+  fullName: z.string().trim().min(2, "Enter the full name.").max(120),
+  batchYear: z
+    .union([
+      z.literal(""),
+      z.coerce
+        .number()
+        .int()
+        .min(1968, "Batch year cannot precede 1968.")
+        .max(2100, "Enter a valid batch year."),
+    ])
+    .transform((v) => (v === "" ? null : v)),
+  alexisName: optionalText(),
+  batchName: optionalText(),
+  dateSurvived: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid date.")
+    .optional()
+    .or(z.literal(""))
+    .transform((v) => (v && v.length > 0 ? v : null)),
+  gtName: optionalText(),
+  gtNumber: optionalText(60),
+  mwwName: optionalText(),
+  mwwNumber: optionalText(60),
+  contactNumber: optionalText(40),
+});
+
+/** Edit a member's biographical details (name, batch year, fraternal fields). */
+export async function updateMemberProfile(
+  _prev: AdminMemberState,
+  formData: FormData,
+): Promise<AdminMemberState> {
+  const { supabase, tenant, user } = await getAdminContext();
+  const profileId = required(formData, "profileId");
+
+  const parsed = MemberEditSchema.safeParse({
+    fullName: formData.get("fullName"),
+    batchYear: formData.get("batchYear") ?? "",
+    alexisName: formData.get("alexisName") ?? "",
+    batchName: formData.get("batchName") ?? "",
+    dateSurvived: formData.get("dateSurvived") ?? "",
+    gtName: formData.get("gtName") ?? "",
+    gtNumber: formData.get("gtNumber") ?? "",
+    mwwName: formData.get("mwwName") ?? "",
+    mwwNumber: formData.get("mwwNumber") ?? "",
+    contactNumber: formData.get("contactNumber") ?? "",
+  });
+
+  if (!parsed.success) {
+    return {
+      error: "Please correct the errors below.",
+      fieldErrors: parsed.error.flatten().fieldErrors,
+    };
+  }
+
+  const { data: updated, error } = await supabase
+    .from("profiles")
+    .update({
+      full_name: parsed.data.fullName,
+      batch_year: parsed.data.batchYear,
+      custom_fields: fraternalToCustomFields({
+        alexisName: parsed.data.alexisName,
+        batchName: parsed.data.batchName,
+        dateSurvived: parsed.data.dateSurvived,
+        gtName: parsed.data.gtName,
+        gtNumber: parsed.data.gtNumber,
+        mwwName: parsed.data.mwwName,
+        mwwNumber: parsed.data.mwwNumber,
+        contactNumber: parsed.data.contactNumber,
+      }),
+    })
+    .eq("id", profileId)
+    .eq("tenant_id", tenant.id)
+    .select("user_id")
+    .maybeSingle();
+  if (error) return { error: error.message };
+  if (!updated) return { error: "Member not found." };
+
+  // Biographical edits are not covered by the handle_profile_change trigger
+  // (it audits status/chapter only), so record one explicitly.
+  await supabase.from("audit_logs").insert({
+    tenant_id: tenant.id,
+    action: "member_updated",
+    performed_by: user.id,
+    target_user: updated.user_id,
+    metadata: { profile_id: profileId },
+  });
+
+  revalidateMember(profileId);
+  return { notice: "Member details updated." };
+}
+
+/** Hard-delete a member from THIS org (profiles + nfc_cards + tenant_users). */
+export async function deleteMember(formData: FormData): Promise<void> {
+  const { supabase } = await getAdminContext();
+  const profileId = required(formData, "profileId");
+
+  const { error } = await supabase.rpc("delete_member", {
+    p_profile_id: profileId,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin");
+  // The member detail page no longer exists; return to the members list. Resolve
+  // the tenant base path so it works in both path mode and custom-domain mode.
+  const basePath = await getActiveTenantBasePath();
+  redirect(tenantHref(basePath, "/admin"));
 }
 
 /** Assign (or clear) a member's chapter. */
