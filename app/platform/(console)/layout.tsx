@@ -22,6 +22,7 @@ export default async function PlatformLayout({
           <div className="flex items-center gap-3">
             <span className="tgp-eyebrow text-[10px] text-gold/70">Super Admin</span>
             <form action={signOut}>
+              <input type="hidden" name="redirectTo" value="/platform/login" />
               <SubmitButton size="sm" variant="ghost" pendingText="…">
                 <LogOut />
                 Sign out
