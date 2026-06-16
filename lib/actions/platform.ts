@@ -209,6 +209,42 @@ export async function verifyCustomDomain(
   return { notice: "Domain verified — it's now live." };
 }
 
+/**
+ * Mark a tenant's custom domain verified WITHOUT the DNS TXT check. For hosts you
+ * control where a `_tgp-verify` record isn't possible — e.g. a free `*.vercel.app`
+ * subdomain in a demo. Super-admin only; audited. (For real domains, use Verify.)
+ */
+export async function markCustomDomainVerified(
+  _prev: PlatformState,
+  formData: FormData,
+): Promise<PlatformState> {
+  const { supabase, user } = await getPlatformContext();
+  const tenantId = String(formData.get("tenantId") ?? "");
+  if (!tenantId) return { error: "Missing tenant." };
+
+  const { data: t, error: readErr } = await supabase
+    .from("tenants")
+    .select("custom_domain")
+    .eq("id", tenantId)
+    .maybeSingle<{ custom_domain: string | null }>();
+  if (readErr) return { error: readErr.message };
+  if (!t?.custom_domain) return { error: "Save a domain first." };
+
+  const { error } = await supabase
+    .from("tenants")
+    .update({ domain_verified_at: new Date().toISOString(), domain_verify_token: null })
+    .eq("id", tenantId);
+  if (error) return { error: error.message };
+  await supabase.from("audit_logs").insert({
+    tenant_id: tenantId,
+    action: "domain_force_verified",
+    performed_by: user.id,
+    metadata: { domain: t.custom_domain },
+  });
+  revalidatePath(`/platform/tenants/${tenantId}`);
+  return { notice: "Domain marked verified (DNS check skipped)." };
+}
+
 /** Remove a tenant's custom domain and clear verification state. */
 export async function removeCustomDomain(
   _prev: PlatformState,

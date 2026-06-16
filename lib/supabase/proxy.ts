@@ -80,12 +80,22 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // ---- Custom-domain host mode ----------------------------------------------
-  // A request on a non-canonical Host is a tenant's verified custom domain; its
-  // whole path is tenant-relative (a transparent alias for /t/[slug]).
+  // A request whose Host belongs to a VERIFIED, active tenant custom domain is a
+  // transparent alias for that tenant's /t/[slug] routes. The app's OWN hosts —
+  // localhost, the configured APP_HOST, and this Vercel deployment's production +
+  // preview URLs — are fast-pathed (no DB lookup). Any OTHER host is resolved; if
+  // no verified tenant owns it (incl. the app's own domain or an unknown host) it
+  // falls through to path mode rather than 404ing. This lets a tenant use a free
+  // *.vercel.app subdomain as its custom domain.
   const host = normalizeHost(request.headers.get("host"));
-  if (host && !isCanonicalHost(host, env.APP_HOST)) {
-    const tenant = await resolveTenantByHost(host);
-    if (!tenant) return rewrite("/workspace-not-found", request, response);
+  const ownHost =
+    !host ||
+    isCanonicalHost(host, env.APP_HOST) ||
+    host === normalizeHost(process.env.VERCEL_PROJECT_PRODUCTION_URL) ||
+    host === normalizeHost(process.env.VERCEL_URL);
+  const hostTenant = !ownHost && host ? await resolveTenantByHost(host) : null;
+  if (hostTenant && host) {
+    const tenant = hostTenant;
 
     // A custom domain is a transparent alias: a tenant-aware redirect to an
     // absolute `/t/<this-slug>/<rest>` (e.g. from register/join) is equivalent

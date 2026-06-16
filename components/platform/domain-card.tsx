@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { CheckCircle2, CircleAlert, Globe, ShieldCheck, Trash2 } from "lucide-react";
+import { CheckCircle2, CircleAlert, Globe, ShieldCheck, ShieldQuestion, Trash2 } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Field } from "@/components/ui/field";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SubmitButton } from "@/components/ui/submit-button";
 import {
+  markCustomDomainVerified,
   removeCustomDomain,
   setCustomDomain,
   verifyCustomDomain,
@@ -30,10 +31,11 @@ export function DomainCard({
 }) {
   const [setState, setAction] = useActionState(setCustomDomain, initial);
   const [verifyState, verifyAction] = useActionState(verifyCustomDomain, initial);
+  const [markState, markAction] = useActionState(markCustomDomainVerified, initial);
   const [removeState, removeAction] = useActionState(removeCustomDomain, initial);
 
-  const error = setState.error || verifyState.error || removeState.error;
-  const notice = setState.notice || verifyState.notice || removeState.notice;
+  const error = setState.error || verifyState.error || markState.error || removeState.error;
+  const notice = setState.notice || verifyState.notice || markState.notice || removeState.notice;
 
   return (
     <div className="space-y-4">
@@ -90,6 +92,10 @@ export function DomainCard({
                 2. Add <span className="tgp-mono">{domain}</span> to the Vercel project (Settings →
                 Domains) and point the domain&apos;s DNS at Vercel. TLS is issued automatically.
               </p>
+              <p className="border-t border-border/60 pt-2 text-muted-foreground">
+                No DNS control (e.g. a <span className="tgp-mono">*.vercel.app</span> demo subdomain)?
+                Use <span className="text-foreground">Mark verified</span> to skip the TXT check.
+              </p>
             </div>
           )}
 
@@ -111,6 +117,15 @@ export function DomainCard({
                 <SubmitButton size="sm" pendingText="Checking…">
                   <ShieldCheck />
                   Verify
+                </SubmitButton>
+              </form>
+            )}
+            {!verifiedAt && (
+              <form action={markAction}>
+                <input type="hidden" name="tenantId" value={tenantId} />
+                <SubmitButton size="sm" variant="outline" pendingText="…">
+                  <ShieldQuestion />
+                  Mark verified
                 </SubmitButton>
               </form>
             )}
