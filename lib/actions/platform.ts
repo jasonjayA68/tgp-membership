@@ -232,7 +232,7 @@ export async function markCustomDomainVerified(
 
   const { error } = await supabase
     .from("tenants")
-    .update({ domain_verified_at: new Date().toISOString() })
+    .update({ domain_verified_at: new Date().toISOString(), domain_verify_token: null })
     .eq("id", tenantId);
   if (error) return { error: error.message };
   await supabase.from("audit_logs").insert({
