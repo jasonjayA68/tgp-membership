@@ -14,7 +14,9 @@ export type AuthState = {
 function safeNext(value: FormDataEntryValue | null): string {
   const next = typeof value === "string" ? value : "";
   // Only allow internal, non-protocol-relative paths (prevents open redirects).
-  return next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  return next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\")
+    ? next
+    : "/";
 }
 
 const optionalText = (max = 120) =>
@@ -175,10 +177,20 @@ export async function signIn(
   redirect(next);
 }
 
-export async function signOut(): Promise<void> {
+export async function signOut(formData: FormData): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect("/login");
+  // Destination-aware: members → their org homepage, super admins → /platform/login.
+  // Only accept an internal, non-protocol-relative path (open-redirect guard).
+  const raw = formData.get("redirectTo");
+  const dest =
+    typeof raw === "string" &&
+    raw.startsWith("/") &&
+    !raw.startsWith("//") &&
+    !raw.startsWith("/\\")
+      ? raw
+      : "/login";
+  redirect(dest);
 }
 
 /** Logged-in user self-joins a tenant as a pending member. */

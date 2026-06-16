@@ -56,6 +56,7 @@ export function AppNav({
           })}
 
           <form action={signOut}>
+            <input type="hidden" name="redirectTo" value={tenantHref(basePath, "/home")} />
             <Button type="submit" size="sm" variant="ghost">
               <LogOut />
               <span className="hidden sm:inline">Sign out</span>
