@@ -42,7 +42,11 @@ export async function AuthScreen({
 
   return (
     <div style={themeStyle} className="relative isolate flex w-full flex-col items-center">
-      <AuthBrandHeader name={brand.name} logoUrl={brand.logoUrl} />
+      <AuthBrandHeader
+        name={brand.name}
+        logoUrl={brand.logoUrl}
+        href={tenant ? `/t/${tenant}/home` : "/"}
+      />
       <Card
         className={`mx-auto w-full ${isLogin ? "max-w-md" : "max-w-2xl"} border-gold/30 tgp-frame tgp-glow`}
       >

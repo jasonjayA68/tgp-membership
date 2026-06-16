@@ -5,9 +5,11 @@ import { Brandmark } from "@/components/brand/brandmark";
 export function AuthBrandHeader({
   name,
   logoUrl,
+  href = "/",
 }: {
   name: string;
   logoUrl: string | null;
+  href?: string;
 }) {
   return (
     <>
@@ -20,7 +22,7 @@ export function AuthBrandHeader({
         className="pointer-events-none absolute inset-x-0 -top-12 -z-10 h-[520px] bg-gradient-to-b from-transparent to-background [mask-image:linear-gradient(to_bottom,transparent,black_88%)]"
       />
       <Link
-        href="/"
+        href={href}
         className="mb-8 flex flex-col items-center gap-3 text-center transition-opacity hover:opacity-90"
       >
       <span className="relative">
