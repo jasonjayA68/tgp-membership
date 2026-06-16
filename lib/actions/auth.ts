@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
+import { getBaseUrl } from "@/lib/site";
 
 export type AuthState = {
   error?: string;
@@ -88,6 +89,11 @@ export async function signUp(
     return typeof v === "string" && v.length > 0 ? v : null;
   })();
 
+  // After email confirmation, land the member in THEIR organization's portal
+  // (not the global/platform login). The /auth/confirm route reads `next`.
+  const confirmNext = tenantSlug ? `/t/${tenantSlug}/dashboard` : "/dashboard";
+  const emailRedirectTo = `${await getBaseUrl()}/auth/confirm?next=${encodeURIComponent(confirmNext)}`;
+
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
@@ -95,6 +101,7 @@ export async function signUp(
     // These land in raw_user_meta_data; the handle_new_user trigger copies them
     // into the member's profile row (works whether or not email is confirmed).
     options: {
+      emailRedirectTo,
       data: {
         full_name: parsed.data.fullName,
         tenant_slug: tenantSlug,
