@@ -48,7 +48,7 @@ export function RegisterForm({ tenant }: { tenant?: string }) {
           <p className="font-medium text-foreground">Check your inbox</p>
           <p>{state.notice}</p>
           <Link
-            href="/login"
+            href={tenant ? `/t/${tenant}/login` : "/login"}
             className="inline-block text-gold underline-offset-4 hover:underline"
           >
             Return to sign in
