@@ -23,6 +23,17 @@ export const PLATFORM = {
     "A multi-tenant platform for organizations to issue digital member IDs, manage chapters, and verify membership instantly via NFC.",
 } as const;
 
+/**
+ * Shared homepage copy (motto/tagline). One swap point for now; a per-tenant
+ * `tagline` field is the future change. First tenants are TGP councils.
+ */
+export const HOMEPAGE = {
+  eyebrow: "Official Membership Registry",
+  tagline: "Fortis Voluntas Fraternitas",
+  subtext:
+    "Light over darkness — your standing in the brotherhood, recorded, sealed, and verifiable in real time.",
+} as const;
+
 type Tone = "gold" | "amber" | "muted" | "danger";
 
 export const STATUS_META: Record<
