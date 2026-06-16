@@ -2,7 +2,6 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import {
-  CalendarDays,
   Hash,
   MapPin,
   Phone,
@@ -182,7 +181,36 @@ export default async function VerifyPage({
     dateStyle: "long",
     timeStyle: "short",
   }).format(new Date());
-  const hasChapter = card.chapter || card.district || card.region;
+  // Detail rows, in display order:
+  //   1. Public fields in their configured order (Alexis Name, Batch Name, …).
+  //   2. Chapter, slotted in right after the batch field so it reads with the
+  //      fraternal/identity details rather than the geographic block.
+  //   3. District + Council pinned to the bottom, just above the call-to-verify.
+  // (The core "Batch" year row is intentionally dropped — "Batch Name" covers it.)
+  const chapterRow = card.chapter ? (
+    <DetailRow key="chapter" label="Chapter" value={card.chapter} />
+  ) : null;
+  const detailRows: React.ReactNode[] = [];
+  let chapterPlaced = false;
+  for (const field of card.public_fields) {
+    detailRows.push(
+      <DetailRow key={field.key} label={field.label} value={<FieldValue field={field} />} />,
+    );
+    if (chapterRow && field.key === "batch_name") {
+      detailRows.push(chapterRow);
+      chapterPlaced = true;
+    }
+  }
+  // No batch field for this tenant — fall back to showing Chapter first.
+  if (chapterRow && !chapterPlaced) detailRows.unshift(chapterRow);
+  if (card.district) {
+    detailRows.push(<DetailRow key="district" label="District" value={card.district} />);
+  }
+  if (card.region) {
+    detailRows.push(
+      <DetailRow key="council" label="Council" value={card.region} icon={MapPin} />,
+    );
+  }
 
   return (
     <PageShell style={themeStyle}>
@@ -255,24 +283,10 @@ export default async function VerifyPage({
           </div>
         </div>
 
-        {/* Core + public fields */}
-        {(hasChapter || card.batch_year || card.public_fields.length > 0) && (
+        {/* Identity, fraternal + geographic details */}
+        {detailRows.length > 0 && (
           <div className="relative z-10 border-t border-gold/20 bg-ink/40 px-5 py-4">
-            <dl className="divide-y divide-gold/15">
-              {card.chapter && <DetailRow label="Chapter" value={card.chapter} />}
-              {card.district && <DetailRow label="District" value={card.district} />}
-              {card.region && <DetailRow label="Council" value={card.region} icon={MapPin} />}
-              {card.batch_year && (
-                <DetailRow label="Batch" value={card.batch_year} icon={CalendarDays} />
-              )}
-              {card.public_fields.map((field) => (
-                <DetailRow
-                  key={field.key}
-                  label={field.label}
-                  value={<FieldValue field={field} />}
-                />
-              ))}
-            </dl>
+            <dl className="divide-y divide-gold/15">{detailRows}</dl>
           </div>
         )}
 
