@@ -1,4 +1,4 @@
-import { HomeContentSchema, safeHref, newBlock } from "./blocks.ts";
+import { HomeContentSchema, safeHref, newBlock, DEFAULT_HOME } from "./blocks.ts";
 
 function assert(cond: boolean, msg: string) {
   if (!cond) throw new Error("FAIL: " + msg);
@@ -22,5 +22,8 @@ const parsed = HomeContentSchema.safeParse({
   blocks: [{ id: "x", type: "cta", props: { heading: "h", label: "go", href: "javascript:bad" } }],
 });
 assert(parsed.success && parsed.data.blocks[0].props.href === null, "bad href in block → null");
+
+// The shipped default homepage is a valid document.
+assert(HomeContentSchema.safeParse(DEFAULT_HOME).success, "DEFAULT_HOME is valid");
 
 console.log("OK: blocks validator checks pass");
